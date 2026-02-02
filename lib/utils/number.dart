@@ -43,7 +43,14 @@ extension DurationFormat on num {
     int hours = (totalSeconds ~/ 3600).abs();
     int minutes = (totalSeconds % 3600) ~/ 60;
     int seconds = totalSeconds % 60;
-
     return '${totalSeconds < 0 ? '- ' : ''}${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  String get toHoursMinutes {
+    int totalSeconds = toInt();
+    int hours = (totalSeconds ~/ 3600).abs();
+    int minutes = (totalSeconds % 3600) ~/ 60;
+    if (hours == 0) return '$minutes min';
+    return '${hours}h ${minutes.toString().padLeft(2, '0')}m';
   }
 }

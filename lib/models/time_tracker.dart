@@ -5,7 +5,7 @@ class TimerModel {
   DateTime? startDateTime;
   DateTime? endDateTime;
   Duration? timeFree;
-  Duration? creditDur;
+  Duration? timeOver;
   String? project;
   Uri? url;
 

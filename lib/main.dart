@@ -1,7 +1,19 @@
 import 'package:bbt_time_tracker/pages/home.dart';
+import 'package:bbt_time_tracker/utils/global_timer.dart';
 import 'package:flutter/material.dart';
 
+class AppLifecycleObserver extends WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+  }
+}
+
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  GlobalTimer().initialize();
+
+  WidgetsBinding.instance.addObserver(AppLifecycleObserver());
   runApp(const MyApp());
 }
 
