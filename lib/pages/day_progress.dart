@@ -9,7 +9,7 @@ class MultiLevelCircularProgress extends StatefulWidget {
   final List<TimerModel> timers;
   final int startWorkHour;
 
-  const MultiLevelCircularProgress({super.key, required this.timers, this.startWorkHour = 0});
+  const MultiLevelCircularProgress({super.key, required this.timers, this.startWorkHour = 11});
 
   @override
   State<MultiLevelCircularProgress> createState() => _MultiLevelCircularProgressState();
