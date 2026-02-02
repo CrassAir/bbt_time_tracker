@@ -7,9 +7,8 @@ import 'package:flutter/material.dart';
 
 class MultiLevelCircularProgress extends StatefulWidget {
   final List<TimerModel> timers;
-  final int startWorkHour;
 
-  const MultiLevelCircularProgress({super.key, required this.timers, this.startWorkHour = 11});
+  const MultiLevelCircularProgress({super.key, required this.timers});
 
   @override
   State<MultiLevelCircularProgress> createState() => _MultiLevelCircularProgressState();
@@ -19,6 +18,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
   late AnimationController _controller;
   late Animation<double> _animation;
   final double _totalSeconds = 28000;
+  Duration startWorkTime = Duration(hours: 11);
   double _leftSeconds = 0;
   double _spentSeconds = 0;
   VoidCallback? listener;
@@ -36,7 +36,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
 
   void dayListener() {
     if (listener == null || !GlobalTimer().isActiveListener(listener!)) {
-      var starWorkDay = DateTime.now().startOfDay!.add(Duration(hours: widget.startWorkHour));
+      var starWorkDay = DateTime.now().startOfDay!.add(startWorkTime);
       if (DateTime.now().isAfter(starWorkDay)) {
         listener = startTimer;
         GlobalTimer().addListener(listener!);
@@ -45,7 +45,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
   }
 
   void startTimer() {
-    var starWorkDay = DateTime.now().startOfDay!.add(Duration(hours: widget.startWorkHour));
+    var starWorkDay = DateTime.now().startOfDay!.add(startWorkTime);
     if (DateTime.now().isAfter(starWorkDay)) {
       _leftSeconds = DateTime.now().difference(starWorkDay).inSeconds.toDouble();
     }
@@ -74,8 +74,8 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
       animation: _animation,
       builder: (context, child) {
         return Container(
-          width: 220,
-          height: 220,
+          width: 240,
+          height: 240,
           margin: EdgeInsets.only(top: 16),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
@@ -112,8 +112,8 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
               ),
 
               Container(
-                width: 160,
-                height: 160,
+                width: 180,
+                height: 180,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
@@ -127,7 +127,9 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
                       style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
                     ),
                     Text(
-                      _leftSeconds <= 0 ? 'start in ${widget.startWorkHour}:00' :_leftSeconds.toHoursMinutesSeconds,
+                      _leftSeconds <= 0
+                          ? 'start in ${startWorkTime.inSeconds.toHoursMinutes}'
+                          : _leftSeconds.toHoursMinutesSeconds,
                       style: TextStyle(fontSize: 16, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
                     ),
                     SizedBox(height: 8),
@@ -142,6 +144,41 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
                         fontWeight: FontWeight.bold,
                         color: _spentSeconds > _leftSeconds ? Colors.green.shade600 : Colors.red.shade600,
                       ),
+                    ),
+                    SizedBox(height: 8),
+                    AnimatedSwitcher(
+                      duration: 250.ms,
+                      child: _leftSeconds == 0
+                          ? ElevatedButton(
+                              key: ValueKey('1'),
+                              onPressed: () {
+                                var now = DateTime.now();
+                                startWorkTime = Duration(hours: now.hour, minutes: now.minute, seconds: now.second - 1);
+                                startTimer();
+                                _leftSeconds = 1;
+                                setState(() {});
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: Text('Start day'),
+                            )
+                          : ElevatedButton(
+                              key: ValueKey('2'),
+                              onPressed: () {
+                                GlobalTimer().removeAllListeners();
+                                startWorkTime = Duration(hours: 11);
+                                _leftSeconds = 0;
+                                _spentSeconds = 0;
+                                setState(() {});
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: Text('Stop day'),
+                            ),
                     ),
                   ],
                 ),
@@ -170,7 +207,7 @@ class CustomPainterCircle extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = 92.0;
+    final radius = 102.0;
 
     final paint = Paint()
       ..color = color

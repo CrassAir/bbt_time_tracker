@@ -19,7 +19,6 @@ class _HomePageState extends State<HomePage> {
   final GlobalKey<FormBuilderState> formKey = GlobalKey<FormBuilderState>();
   List<TimerModel> timers = [];
 
-
   void onRemove(index) {
     timers.removeAt(index);
     setState(() {});
@@ -49,46 +48,32 @@ class _HomePageState extends State<HomePage> {
                     validator: FormBuilderValidators.required(),
                   ),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    spacing: 4,
+                    mainAxisAlignment: MainAxisAlignment.end,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      ElevatedButton(
-                        onPressed: () {
-                          GlobalTimer().removeAllListeners();
-                          setState(() {});
-                        },
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                        child: Text('Stop day'),
+                      SizedBox(
+                        width: 60,
+                        child: FormBuilderTextField(
+                          name: 'hours',
+                          valueTransformer: (value) => int.tryParse(value ?? '0'),
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          decoration: InputDecoration(label: Text('HH'), border: OutlineInputBorder()),
+                          validator: FormBuilderValidators.numeric(checkNullOrEmpty: false),
+                        ),
                       ),
-                      Row(
-                        spacing: 4,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          SizedBox(
-                            width: 60,
-                            child: FormBuilderTextField(
-                              name: 'hours',
-                              valueTransformer: (value) => int.tryParse(value ?? '0'),
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                              decoration: InputDecoration(label: Text('HH'), border: OutlineInputBorder()),
-                              validator: FormBuilderValidators.numeric(checkNullOrEmpty: false),
-                            ),
-                          ),
-                          Text(':', style: TextStyle(fontSize: 40)),
-                          SizedBox(
-                            width: 60,
-                            child: FormBuilderTextField(
-                              name: 'minutes',
-                              decoration: InputDecoration(label: Text('MM'), border: OutlineInputBorder()),
-                              valueTransformer: (value) => int.tryParse(value ?? '0'),
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                              validator: FormBuilderValidators.numeric(checkNullOrEmpty: false),
-                            ),
-                          ),
-                          IconButton(onPressed: onSubmit, icon: Icon(Icons.add), iconSize: 35),
-                        ],
+                      Text(':', style: TextStyle(fontSize: 40)),
+                      SizedBox(
+                        width: 60,
+                        child: FormBuilderTextField(
+                          name: 'minutes',
+                          decoration: InputDecoration(label: Text('MM'), border: OutlineInputBorder()),
+                          valueTransformer: (value) => int.tryParse(value ?? '0'),
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          validator: FormBuilderValidators.numeric(checkNullOrEmpty: false),
+                        ),
                       ),
+                      IconButton(onPressed: onSubmit, icon: Icon(Icons.add), iconSize: 35),
                     ],
                   ),
                 ],
@@ -137,7 +122,7 @@ class _HomePageState extends State<HomePage> {
       var hours = data['hours'] == 0 && data['minutes'] == 0 ? 1 : data['hours'];
       var timer = TimerModel(
         name: data['name'],
-        duration: Duration(hours: hours, minutes: data['minutes'] ?? 0),
+        duration: Duration(hours: hours ?? 0, minutes: data['minutes'] ?? 0),
       );
       setState(() {
         timers.add(timer);
@@ -145,3 +130,9 @@ class _HomePageState extends State<HomePage> {
     }
   }
 }
+
+// TODO: Оповещения на вышедшее общее время, на время карточки
+// TODO: Выгрузка данных в эксель по дням
+// TODO: Сохранение данных в таблицу, поддержать кнопку конец дня, задачи на паузу до следующего дня по отжатии
+// TODO: Сделать сервер, добавить тг бота
+// TODO: Добавить настройки(старт рабочего дня, робочее время)
