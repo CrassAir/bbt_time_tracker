@@ -1,6 +1,10 @@
 import 'package:bbt_time_tracker/pages/home.dart';
+import 'package:bbt_time_tracker/services/strore.dart';
 import 'package:bbt_time_tracker/utils/global_timer.dart';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
+
+late ObjectBox objectbox;
 
 class AppLifecycleObserver extends WidgetsBindingObserver {
   @override
@@ -9,11 +13,21 @@ class AppLifecycleObserver extends WidgetsBindingObserver {
   }
 }
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   GlobalTimer().initialize();
-
   WidgetsBinding.instance.addObserver(AppLifecycleObserver());
+  objectbox = await ObjectBox.create();
+  await windowManager.ensureInitialized();
+
+  WindowOptions windowOptions = const WindowOptions(
+    size: Size(600, 1000),
+    center: true,
+    backgroundColor: Colors.transparent,
+    skipTaskbar: false,
+    titleBarStyle: TitleBarStyle.normal,
+  );
+  windowManager.waitUntilReadyToShow(windowOptions, () {});
   runApp(const MyApp());
 }
 

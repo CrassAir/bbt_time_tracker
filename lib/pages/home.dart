@@ -1,7 +1,8 @@
+import 'package:bbt_time_tracker/main.dart';
 import 'package:bbt_time_tracker/models/time_tracker.dart';
 import 'package:bbt_time_tracker/pages/day_progress.dart';
 import 'package:bbt_time_tracker/pages/timer_item.dart';
-import 'package:bbt_time_tracker/utils/global_timer.dart';
+import 'package:bbt_time_tracker/utils/date_ext.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
@@ -19,7 +20,14 @@ class _HomePageState extends State<HomePage> {
   final GlobalKey<FormBuilderState> formKey = GlobalKey<FormBuilderState>();
   List<TimerModel> timers = [];
 
+  @override
+  void initState() {
+    super.initState();
+    timers = objectbox.store.box<TimerModel>().getAll();
+  }
+
   void onRemove(index) {
+    objectbox.store.box<TimerModel>().remove(timers[index].id);
     timers.removeAt(index);
     setState(() {});
   }
@@ -73,7 +81,11 @@ class _HomePageState extends State<HomePage> {
                           validator: FormBuilderValidators.numeric(checkNullOrEmpty: false),
                         ),
                       ),
-                      IconButton(onPressed: onSubmit, icon: Icon(Icons.add), iconSize: 35),
+                      SizedBox(width: 8),
+                      SizedBox(
+                        height: 50,
+                        child: ElevatedButton(onPressed: onSubmit, child: Text('ADD TASK')),
+                      ),
                     ],
                   ),
                 ],
@@ -82,28 +94,25 @@ class _HomePageState extends State<HomePage> {
             SizedBox(height: 24),
             Divider(thickness: 1, color: Colors.blue),
             Flexible(
-              child: ListView.separated(
-                itemCount: timers.length,
-                shrinkWrap: true,
-                reverse: true,
-                separatorBuilder: (context, index) =>
-                    Container(height: 1, width: double.maxFinite, color: Colors.black),
-                itemBuilder: (context, index) {
-                  var locTimer = timers[index];
-                  return SwipeActionCell(
-                    key: ValueKey(locTimer.name),
-                    trailingActions: <SwipeAction>[
-                      SwipeAction(
-                        icon: Icon(Icons.delete, color: Colors.white),
-                        onTap: (CompletionHandler handler) async {
-                          onRemove(index);
-                        },
-                        color: Colors.red,
-                      ),
-                    ],
-                    child: TimerItem(timerModel: locTimer),
-                  );
-                },
+              child: SingleChildScrollView(
+                child: Column(
+                  children: timers.mapIndexed((i, el) {
+                    var locTimer = timers[i];
+                    return SwipeActionCell(
+                      key: ValueKey(locTimer.name),
+                      trailingActions: <SwipeAction>[
+                        SwipeAction(
+                          icon: Icon(Icons.delete, color: Colors.white),
+                          onTap: (CompletionHandler handler) async {
+                            onRemove(i);
+                          },
+                          color: Colors.red,
+                        ),
+                      ],
+                      child: TimerItem(timerModel: locTimer),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
           ],
@@ -120,20 +129,17 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       var hours = data['hours'] == 0 && data['minutes'] == 0 ? 1 : data['hours'];
-      var timer = TimerModel(
-        name: data['name'],
-        duration: Duration(hours: hours ?? 0, minutes: data['minutes'] ?? 0),
-      );
-      setState(() {
-        timers.add(timer);
-      });
+      var timer = TimerModel(name: data['name']);
+      timer.estimate = Duration(hours: hours ?? 0, minutes: data['minutes'] ?? 0);
+      objectbox.store.box<TimerModel>().put(timer);
+      timers.insert(0, timer);
+      setState(() {});
     }
   }
 }
 
-// TODO: Оповещения на вышедшее общее время, на время карточки
+// TODO: Оповещения на вышедшее общее время
 // TODO: Выгрузка данных в эксель по дням
-// TODO: Сохранение данных в таблицу, поддержать кнопку конец дня, задачи на паузу до следующего дня по отжатии
 // TODO: Сделать сервер, добавить тг бота
 // TODO: Добавить настройки(старт рабочего дня, робочее время)
 // TODO: Добавить размеры окна макс, мин, дефолт

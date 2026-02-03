@@ -17,7 +17,7 @@ class MultiLevelCircularProgress extends StatefulWidget {
 class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  final double _totalSeconds = 28000;
+  final double _totalSeconds = 28800;
   Duration startWorkTime = Duration(hours: 11);
   double _leftSeconds = 0;
   double _spentSeconds = 0;
@@ -37,7 +37,8 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
   void dayListener() {
     if (listener == null || !GlobalTimer().isActiveListener(listener!)) {
       var starWorkDay = DateTime.now().startOfDay!.add(startWorkTime);
-      if (DateTime.now().isAfter(starWorkDay)) {
+      var endWorkDay = starWorkDay.add(Duration(seconds: _totalSeconds.toInt()));
+      if (DateTime.now().isAfter(starWorkDay) && DateTime.now().isBefore(endWorkDay)) {
         listener = startTimer;
         GlobalTimer().addListener(listener!);
       }
@@ -52,7 +53,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
     _spentSeconds = 0;
     widget.timers.forEach((el) {
       if (el.endDateTime != null) {
-        _spentSeconds += el.duration.inSeconds.toDouble() + (el.timeOver?.inSeconds ?? 0);
+        _spentSeconds += el.estimate.inSeconds.toDouble() + (el.durationLeft?.inSeconds ?? 0);
       }
     });
     setState(() {});
@@ -84,14 +85,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
           child: Stack(
             alignment: Alignment.center,
             children: [
-              CustomPaint(
-                painter: CustomPainterCircle(
-                  progress: 1.0,
-                  color: Colors.grey.shade200,
-                  strokeWidth: 25,
-                  angleOffset: 0,
-                ),
-              ),
+              CustomPaint(painter: CustomPainterCircle(progress: 1.0, color: Colors.grey.shade200, strokeWidth: 25, angleOffset: 0)),
 
               CustomPaint(
                 painter: CustomPainterCircle(
@@ -127,18 +121,16 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
                       style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
                     ),
                     Text(
-                      _leftSeconds <= 0
-                          ? 'start in ${startWorkTime.inSeconds.toHoursMinutes}'
-                          : _leftSeconds.toHoursMinutesSeconds,
+                      _leftSeconds <= 0 ? 'start in ${startWorkTime.inSeconds.toHoursMinutes}' : _leftSeconds.toHoursMinutesSeconds,
                       style: TextStyle(fontSize: 16, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      _spentSeconds > _leftSeconds ? 'Free time' : 'Lack of time',
+                      _spentSeconds > math.min(_leftSeconds, _totalSeconds) ? 'Free time' : 'Lack of time',
                       style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
                     ),
                     Text(
-                      (_spentSeconds - _leftSeconds).abs().toHoursMinutesSeconds,
+                      (_spentSeconds - math.min(_leftSeconds, _totalSeconds)).abs().toHoursMinutesSeconds,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -158,10 +150,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
                                 _leftSeconds = 1;
                                 setState(() {});
                               },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                              ),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                               child: Text('Start day'),
                             )
                           : ElevatedButton(
@@ -173,10 +162,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
                                 _spentSeconds = 0;
                                 setState(() {});
                               },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                              ),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                               child: Text('Stop day'),
                             ),
                     ),
@@ -197,12 +183,7 @@ class CustomPainterCircle extends CustomPainter {
   final double strokeWidth;
   final double angleOffset;
 
-  CustomPainterCircle({
-    required this.progress,
-    required this.color,
-    required this.strokeWidth,
-    required this.angleOffset,
-  });
+  CustomPainterCircle({required this.progress, required this.color, required this.strokeWidth, required this.angleOffset});
 
   @override
   void paint(Canvas canvas, Size size) {
