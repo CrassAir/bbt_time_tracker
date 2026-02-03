@@ -25,6 +25,7 @@ dependencies:
 
   audioplayers: ^6.5.1
   window_manager: ^0.3.8
+  windows_single_instance: ^1.0.1
 
 dev_dependencies:
   flutter_test:

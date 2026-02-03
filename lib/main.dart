@@ -3,6 +3,7 @@ import 'package:bbt_time_tracker/services/strore.dart';
 import 'package:bbt_time_tracker/utils/global_timer.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:windows_single_instance/windows_single_instance.dart';
 
 late ObjectBox objectbox;
 
@@ -13,16 +14,26 @@ class AppLifecycleObserver extends WidgetsBindingObserver {
   }
 }
 
-void main() async {
+void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   GlobalTimer().initialize();
   WidgetsBinding.instance.addObserver(AppLifecycleObserver());
   objectbox = await ObjectBox.create();
-  await windowManager.ensureInitialized();
 
+  await WindowsSingleInstance.ensureSingleInstance(
+    args,
+    "bbt_time_tracker_2026",
+    onSecondWindow: (args) async {
+      await windowManager.focus();
+      await windowManager.show();
+    },
+  );
+
+  await windowManager.ensureInitialized();
   WindowOptions windowOptions = const WindowOptions(
     size: Size(600, 1000),
     center: true,
+    title: 'BBT Time Tracker',
     backgroundColor: Colors.transparent,
     skipTaskbar: false,
     titleBarStyle: TitleBarStyle.normal,
