@@ -65,8 +65,8 @@ class _TimerItemState extends State<TimerItem> {
       setState(() {});
     } else {
       listener = changeDur;
-      if (widget.timerModel.endDateTime != null) {
-        widget.timerModel.endDateTime = null;
+      if (widget.timerModel.isComplete) {
+        widget.timerModel.isComplete = false;
         objectbox.store.box<TimerModel>().put(widget.timerModel);
         left.value = widget.timerModel.durationLeft ?? Duration(seconds: 1);
       }
@@ -77,7 +77,7 @@ class _TimerItemState extends State<TimerItem> {
   }
 
   void stopTimer() {
-    widget.timerModel.endDateTime = DateTime.now();
+    widget.timerModel.isComplete = true;
     if (listener != null && GlobalTimer().isActiveListener(listener!)) {
       GlobalTimer().removeListener(listener!);
       listener = null;
@@ -111,11 +111,13 @@ class _TimerItemState extends State<TimerItem> {
 
   void stopListener() {
     isActive = false;
+    widget.timerModel.durationLeft = left.value;
+    objectbox.store.box<TimerModel>().put(widget.timerModel);
     setState(() {});
   }
 
   Widget builder(TimerModel tim) {
-    if (tim.endDateTime == null) {
+    if (!tim.isComplete) {
       if (left.value.inSeconds == 0) {
         return ElevatedButton(onPressed: startTimer, child: Text('START'));
       }
@@ -153,35 +155,39 @@ class _TimerItemState extends State<TimerItem> {
   }
 
   Color colorByState() {
-    var isOver = widget.timerModel.estimate.inSeconds - left.value.inSeconds <= 0;
-    if (widget.timerModel.endDateTime == null) {
+    if (!widget.timerModel.isComplete) {
       if (listener == null || !GlobalTimer().isActiveListener(listener!)) {
         return Colors.yellow.shade300;
       }
     }
-    if (isOver) {
-      return Colors.red.shade100;
-    }
-    if (!isOver && widget.timerModel.endDateTime != null) {
+    if (widget.timerModel.isComplete) {
       return Colors.green.shade100;
     }
     return Colors.blue.shade50;
   }
 
-  void showEditDialog() {
-    GlobalKey formKey = GlobalKey<FormBuilderState>();
+  void showEditDialog() async {
     var tim = widget.timerModel;
-    showDialog(
+    TextEditingController controller = TextEditingController(text: tim.name);
+    await showDialog(
       context: context,
       builder: (context) => Dialog(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: FormBuilder(
-            key: formKey,
+        child: SizedBox(
+          width: 400,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(tim.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                TextField(
+                  controller: controller,
+                  minLines: 1,
+                  maxLines: 6,
+                  onChanged: (value) {
+                    tim.name = value;
+                  },
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 SizedBox(height: 24),
                 ValueListenableBuilder(
                   valueListenable: estimate,
@@ -200,7 +206,6 @@ class _TimerItemState extends State<TimerItem> {
                         if (sub > 0) {
                           widget.timerModel.estimate = Duration(seconds: sub);
                           estimate.value = widget.timerModel.estimate;
-                          objectbox.store.box<TimerModel>().put(widget.timerModel);
                           setState(() {});
                         }
                       },
@@ -210,7 +215,6 @@ class _TimerItemState extends State<TimerItem> {
                       onPressed: () {
                         widget.timerModel.estimate = Duration(seconds: widget.timerModel.estimate.inSeconds + 600);
                         estimate.value = widget.timerModel.estimate;
-                        objectbox.store.box<TimerModel>().put(widget.timerModel);
                         isAlarm = false;
                         setState(() {});
                       },
@@ -258,6 +262,7 @@ class _TimerItemState extends State<TimerItem> {
         ),
       ),
     );
+    objectbox.store.box<TimerModel>().put(tim);
   }
 
   @override
@@ -268,68 +273,81 @@ class _TimerItemState extends State<TimerItem> {
     if (isOver) {
       time = left.value.inSeconds - tim.estimate.inSeconds;
     }
-    return InkWell(
-      onTap: showEditDialog,
-      child: Container(
-        decoration: BoxDecoration(
-          border: BoxBorder.fromLTRB(bottom: BorderSide(color: Colors.black, width: 1)),
-        ),
-        child: BlinkingCard(
-          defaultColor: colorByState(),
-          isBlinking: isAlarm,
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Flexible(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(dateFormat.format(tim.createdAt), style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
-                          Text(tim.name),
-                          if (tim.url != null) Linkable(text: tim.url!.toString()),
-                        ],
-                      ),
-                    ),
-                    Row(
+    return Container(
+      decoration: BoxDecoration(
+        border: BoxBorder.fromLTRB(bottom: BorderSide(color: Colors.black, width: 1)),
+      ),
+      child: BlinkingCard(
+        defaultColor: colorByState(),
+        isBlinking: isAlarm,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 8, horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Flexible(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      spacing: 16,
                       children: [
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              'Estimate ${tim.estimate.inSeconds.toHoursMinutes}',
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                        Tooltip(
+                          message: 'Edit task',
+                          verticalOffset: 10,
+                          child: InkWell(
+                            onTap: showEditDialog,
+                            child: Row(
+                              spacing: 4,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(dateFormat.format(tim.createdAt), style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                                Icon(Icons.edit, size: 10, color: Colors.grey.shade700),
+                              ],
                             ),
+                          ),
+                        ),
+                        SelectableText(tim.name),
+                        if (tim.url != null) Linkable(text: tim.url!.toString()),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: 16,
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        spacing: 8,
+                        children: [
+                          Text(
+                            'Estimate ${tim.estimate.inSeconds.toHoursMinutes}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          ),
+                          if (tim.isComplete)
                             Text(
                               isOver ? 'Over ${time.toHoursMinutes}' : 'Free ${time.toHoursMinutes}',
                               style: TextStyle(fontSize: 18, color: isOver ? Colors.red : Colors.green),
                             ),
-                          ],
-                        ),
-                        SizedBox(
-                          width: 110,
-                          child: AnimatedSwitcher(duration: 250.ms, child: builder(tim)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                if (isActive)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: LinearProgressIndicator(value: (left.value.inSeconds / widget.timerModel.estimate.inSeconds).clamp(0.0, 1.0)),
+                        ],
+                      ),
+                      SizedBox(
+                        width: 110,
+                        child: AnimatedSwitcher(duration: 250.ms, child: builder(tim)),
+                      ),
+                    ],
                   ),
-              ],
-            ),
+                ],
+              ),
+              if (isActive)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: LinearProgressIndicator(value: (left.value.inSeconds / widget.timerModel.estimate.inSeconds).clamp(0.0, 1.0)),
+                ),
+            ],
           ),
         ),
       ),
