@@ -30,7 +30,7 @@ class _HistoryPageState extends State<HistoryPage> {
         child: Column(
           children: timers.mapIndexed((i, el) {
             var locTimer = timers[i];
-            return TimerItem(timerModel: locTimer);
+            return HistoryItem(tim: locTimer);
           }).toList(),
         ),
       ),
@@ -43,6 +43,16 @@ class HistoryItem extends StatelessWidget {
 
   final TimerModel tim;
 
+  Color colorByState() {
+    if (tim.startDateTime == null) {
+      return Colors.yellow.shade300;
+    }
+    if (tim.isComplete) {
+      return Colors.green.shade100;
+    }
+    return Colors.blue.shade50;
+  }
+
   @override
   Widget build(BuildContext context) {
     var left = tim.durationLeft?.inSeconds ?? 0;
@@ -53,6 +63,7 @@ class HistoryItem extends StatelessWidget {
     }
     return Container(
       decoration: BoxDecoration(
+        color: colorByState(),
         border: BoxBorder.fromLTRB(bottom: BorderSide(color: Colors.black, width: 1)),
       ),
       child: Padding(

@@ -31,7 +31,8 @@ void main(List<String> args) async {
 
   await windowManager.ensureInitialized();
   WindowOptions windowOptions = const WindowOptions(
-    size: Size(600, 1000),
+    size: Size(800, 1000),
+    minimumSize: Size(600, 1000),
     center: true,
     title: 'BBT Time Tracker',
     backgroundColor: Colors.transparent,
