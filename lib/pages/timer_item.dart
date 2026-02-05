@@ -263,6 +263,41 @@ class _TimerItemState extends State<TimerItem> {
       ),
     );
     objectbox.store.box<TimerModel>().put(tim);
+    setState(() {});
+  }
+
+  void onSetBranch() async {
+    var tim = widget.timerModel;
+    TextEditingController controller = TextEditingController(text: tim.branchName);
+    await showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: SizedBox(
+          width: 300,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 8,
+              children: [
+                Text('Branch name', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                TextField(
+                  controller: controller,
+                  onSubmitted: (_) {
+                    Navigator.maybePop(context);
+                  },
+                  onChanged: (value) {
+                    tim.branchName = value;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    objectbox.store.box<TimerModel>().put(tim);
+    setState(() {});
   }
 
   @override
@@ -294,20 +329,49 @@ class _TimerItemState extends State<TimerItem> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Tooltip(
-                          message: 'Edit task',
-                          verticalOffset: 10,
-                          child: InkWell(
-                            onTap: showEditDialog,
-                            child: Row(
-                              spacing: 4,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(dateFormat.format(tim.createdAt), style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
-                                Icon(Icons.edit, size: 10, color: Colors.grey.shade700),
-                              ],
+                        Row(
+                          spacing: 24,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Tooltip(
+                              message: 'Edit task',
+                              verticalOffset: 10,
+                              child: InkWell(
+                                onTap: showEditDialog,
+                                child: Row(
+                                  spacing: 4,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(dateFormat.format(tim.createdAt), style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                                    Icon(Icons.edit, size: 10, color: Colors.grey.shade700),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
+                            tim.branchName == null
+                                ? InkWell(
+                                    onTap: onSetBranch,
+                                    child: Text(
+                                      'Enter branch name',
+                                      style: TextStyle(fontSize: 12, color: Colors.blue, decorationColor: Colors.blue),
+                                    ),
+                                  )
+                                : Tooltip(
+                                    message: 'Edit branch name',
+                                    verticalOffset: 10,
+                                    child: Row(
+                                      spacing: 4,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SelectableText(tim.branchName!, style: TextStyle(fontSize: 12)),
+                                        InkWell(
+                                          onTap: onSetBranch,
+                                          child: Icon(Icons.edit, size: 10, color: Colors.grey.shade700),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                          ],
                         ),
                         SelectableText(tim.name),
                         if (tim.url != null) Linkable(text: tim.url!.toString()),

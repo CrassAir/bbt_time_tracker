@@ -16,7 +16,7 @@ class ExportService {
     final excel = Excel.createExcel();
     final sheet = excel['Timer Report'];
 
-    final headers = ['Status', 'Name', 'Created', 'Start', 'End', 'Estimate', 'Duration Left', 'URL'];
+    final headers = ['Status', 'Name', 'Created', 'Start', 'End', 'Estimate', 'Duration Left','Branch name', 'URL'];
 
     for (int i = 0; i < headers.length; i++) {
       final cellIndex = CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0);

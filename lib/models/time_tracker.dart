@@ -10,6 +10,7 @@ class TimerModel {
 
   String name;
   String? project;
+  String? branchName;
 
   @Transient()
   late Duration estimate;
@@ -67,6 +68,7 @@ extension TimerModelExport on TimerModel {
           : '-',
       'Estimate': estimate.inSeconds.toHoursMinutesSeconds,
       'Duration Left': (durationLeft ?? Duration.zero).inSeconds.toHoursMinutesSeconds,
+      'Branch name': branchName ?? '-',
       'URL': urlStr ?? '-',
     };
   }

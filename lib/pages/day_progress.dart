@@ -23,11 +23,11 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
   late WorkDayModel day;
   late AnimationController _controller;
   late Animation<double> _animation;
-  final double _totalSeconds = 28800;
+  final int _totalSeconds = 28800;
   Duration startWorkTime = Duration(hours: 11);
-  double _leftSeconds = 0;
-  double _prevWorkSeconds = 0;
-  double _spentSeconds = 0;
+  int _leftSeconds = 0;
+  int _prevWorkSeconds = 0;
+  int _spentSeconds = 0;
   bool isRun = false;
   VoidCallback? listener;
 
@@ -57,9 +57,9 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
     }
     if (rawDay.startWorkDateTime != null) {
       if (rawDay.endWorkDateTime != null) {
-        _leftSeconds = rawDay.endWorkDateTime!.difference(rawDay.startWorkDateTime!).inSeconds.toDouble();
+        _leftSeconds = rawDay.endWorkDateTime!.difference(rawDay.startWorkDateTime!).inSeconds;
       } else {
-        _leftSeconds = DateTime.now().difference(rawDay.startWorkDateTime!).inSeconds.toDouble();
+        _leftSeconds = DateTime.now().difference(rawDay.startWorkDateTime!).inSeconds;
       }
     }
     day = rawDay;
@@ -68,7 +68,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
   void startDay({DateTime? startDateTime}) {
     isRun = true;
     day.startWorkDateTime ??= startDateTime ?? DateTime.now();
-    _prevWorkSeconds = day.prevWorkTime.inSeconds.toDouble();
+    _prevWorkSeconds = day.prevWorkTime.inSeconds;
     objectbox.store.box<WorkDayModel>().put(day);
     calcTime();
     listener = onTimerTick;
@@ -77,14 +77,17 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
   }
 
   void stopDay({bool isSoft = false}) {
-    isRun = false;
     GlobalTimer().removeAllListeners();
     if (isSoft) {
       GlobalTimer().addListener(listener!);
       GlobalTimer.playTimeUpSound();
+    } else {
+      isRun = false;
     }
+
     day.endWorkDateTime = DateTime.now();
     objectbox.store.box<WorkDayModel>().put(day);
+
     var newDay = WorkDayModel();
     newDay.createToDate = DateTime.now().startOfDay!;
     widget.timers.forEach((el) {
@@ -92,7 +95,13 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
         newDay.prevWorkTime += el.durationLeft ?? Duration.zero;
       }
     });
+    if (_totalSeconds > _leftSeconds) {
+      newDay.debtOfTime = Duration(seconds: (_totalSeconds - _leftSeconds).toInt());
+    } else {
+      newDay.freeTime = Duration(seconds: (_leftSeconds - _totalSeconds).toInt());
+    }
     objectbox.store.box<WorkDayModel>().put(newDay);
+
     setState(() {});
   }
 
@@ -106,9 +115,6 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
       if (day.startWorkDateTime != null &&
           day.endWorkDateTime == null &&
           DateTime.now().isAfter(day.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt())))) {
-        print(day.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt())));
-        print(DateTime.now());
-        print('this');
         stopDay(isSoft: true);
       }
     }
@@ -131,6 +137,12 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
       }
     });
     _spentSeconds = (_spentSeconds - _prevWorkSeconds).abs();
+    if (day.debtOfTime.inSeconds > 0) {
+      _spentSeconds -= day.debtOfTime.inSeconds;
+    }
+    if (day.freeTime.inSeconds > 0) {
+      _spentSeconds += day.freeTime.inSeconds;
+    }
   }
 
   @override
