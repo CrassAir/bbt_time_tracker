@@ -6,9 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:bbt_time_tracker/models/time_tracker.dart';
 
 class ExportService {
-  static Future<String> exportToExcel() async {
-    final timers = TimerModelExport.getAll();
-
+  static Future<String> exportToExcel(List<TimerModel> timers) async {
     if (timers.isEmpty) {
       throw Exception('Нет данных для экспорта');
     }
@@ -41,18 +39,18 @@ class ExportService {
     return file.path;
   }
 
-  static Future<void> shareExcel() async {
+  static Future<void> shareExcel(List<TimerModel> timers) async {
     try {
-      final path = await exportToExcel();
+      final path = await exportToExcel(timers);
       await SharePlus.instance.share(ShareParams(files: [XFile(path)], text: 'Отчет таймеров', title: 'Отчет таймеров'));
     } catch (e) {
       print('Ошибка экспорта: $e');
     }
   }
 
-  static Future<void> openExcel() async {
+  static Future<void> openExcel(List<TimerModel> timers) async {
     try {
-      final path = await exportToExcel();
+      final path = await exportToExcel(timers);
       OpenFile.open(path);
     } catch (e) {
       print('Ошибка открытия: $e');

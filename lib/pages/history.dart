@@ -2,6 +2,7 @@ import 'package:bbt_time_tracker/main.dart';
 import 'package:bbt_time_tracker/models/time_tracker.dart';
 import 'package:bbt_time_tracker/objectbox.g.dart';
 import 'package:bbt_time_tracker/pages/timer_item.dart';
+import 'package:bbt_time_tracker/services/export_service.dart';
 import 'package:bbt_time_tracker/utils/date_ext.dart';
 import 'package:bbt_time_tracker/utils/number.dart';
 import 'package:flutter/material.dart';
@@ -27,7 +28,25 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('History'), centerTitle: true, forceMaterialTransparency: true),
+      appBar: AppBar(
+        title: Text('History'),
+        centerTitle: true,
+        forceMaterialTransparency: true,
+        actions: [
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await ExportService.openExcel(timers);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Отчет выгружен и готов к отправке')));
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+              }
+            },
+            child: Text('EXPORT TO EXCEL'),
+          ),
+          SizedBox(width: 16),
+        ],
+      ),
       body: SingleChildScrollView(
         child: Column(
           children: timers.mapIndexed((i, el) {

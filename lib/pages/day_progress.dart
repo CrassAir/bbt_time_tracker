@@ -174,7 +174,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
                     ElevatedButton(
                       onPressed: () async {
                         try {
-                          await ExportService.openExcel();
+                          await ExportService.openExcel(widget.timers);
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Отчет выгружен и готов к отправке')));
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
