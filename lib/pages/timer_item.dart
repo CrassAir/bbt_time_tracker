@@ -135,7 +135,7 @@ class _TimerItemState extends State<TimerItem> {
             onPressed: resumeTimer,
             child: listener != null && GlobalTimer().isActiveListener(listener!) ? Text('PAUSE') : Text('RESUME'),
           ),
-          ElevatedButton(onPressed: stopTimer, child: Text('STOP')),
+          ElevatedButton(onPressed: stopTimer, child: Text('FINISH')),
           Text(time.toHoursMinutesSeconds, textAlign: TextAlign.right),
         ],
       );
@@ -158,13 +158,13 @@ class _TimerItemState extends State<TimerItem> {
   Color colorByState() {
     if (!widget.timerModel.isComplete && widget.timerModel.startDateTime != null) {
       if (listener == null || !GlobalTimer().isActiveListener(listener!)) {
-        return Colors.yellow.shade300;
+        return Colors.orange;
       }
     }
     if (widget.timerModel.isComplete) {
-      return Colors.green.shade100;
+      return Colors.green;
     }
-    return Colors.blue.shade50;
+    return Colors.blue;
   }
 
   void showEditDialog() async {
@@ -310,11 +310,14 @@ class _TimerItemState extends State<TimerItem> {
       time = left.value.inSeconds - tim.estimate.inSeconds;
     }
     return Container(
+      margin: EdgeInsets.all(6),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        border: BoxBorder.fromLTRB(bottom: BorderSide(color: Colors.black, width: 1)),
+        borderRadius: BorderRadius.circular(10),
+        border: BoxBorder.fromLTRB(right: BorderSide(color: colorByState(), width: 4), left: BorderSide(color: colorByState(), width: 4)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), offset: Offset(0, 4), blurRadius: 10)],
       ),
       child: BlinkingCard(
-        defaultColor: colorByState(),
         isBlinking: isAlarm,
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 8, horizontal: 24),

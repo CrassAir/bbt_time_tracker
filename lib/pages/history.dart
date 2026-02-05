@@ -1,5 +1,6 @@
 import 'package:bbt_time_tracker/main.dart';
 import 'package:bbt_time_tracker/models/time_tracker.dart';
+import 'package:bbt_time_tracker/objectbox.g.dart';
 import 'package:bbt_time_tracker/pages/timer_item.dart';
 import 'package:bbt_time_tracker/utils/date_ext.dart';
 import 'package:bbt_time_tracker/utils/number.dart';
@@ -19,7 +20,8 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   void initState() {
     super.initState();
-    timers = objectbox.store.box<TimerModel>().getAll()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    timers = objectbox.store.box<TimerModel>().query(TimerModel_.isComplete.equals(true)).build().find()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   @override
@@ -45,12 +47,12 @@ class HistoryItem extends StatelessWidget {
 
   Color colorByState() {
     if (tim.startDateTime == null) {
-      return Colors.yellow.shade300;
+      return Colors.yellow;
     }
     if (tim.isComplete) {
-      return Colors.green.shade100;
+      return Colors.green;
     }
-    return Colors.blue.shade50;
+    return Colors.blue;
   }
 
   @override
@@ -62,9 +64,16 @@ class HistoryItem extends StatelessWidget {
       time = left - tim.estimate.inSeconds;
     }
     return Container(
+      margin: EdgeInsets.all(6),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: colorByState(),
-        border: BoxBorder.fromLTRB(bottom: BorderSide(color: Colors.black, width: 1)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: BoxBorder.fromLTRB(
+          right: BorderSide(color: colorByState(), width: 4),
+          left: BorderSide(color: colorByState(), width: 4),
+        ),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), offset: Offset(0, 4), blurRadius: 10)],
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 8, horizontal: 24),
@@ -80,7 +89,15 @@ class HistoryItem extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(dateFormat.format(tim.createdAt), style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        spacing: 24,
+                        children: [
+                          Text(dateFormat.format(tim.createdAt), style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                          if (tim.branchName != null && tim.branchName!.isNotEmpty)
+                            SelectableText(tim.branchName!, style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
                       SelectableText(tim.name),
                       if (tim.url != null) Linkable(text: tim.url!.toString()),
                     ],

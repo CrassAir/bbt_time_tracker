@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 class BlinkingCard extends StatefulWidget {
   final Widget child;
   final bool isBlinking;
-  final Color defaultColor;
 
-  const BlinkingCard({super.key, required this.child, required this.defaultColor, this.isBlinking = false});
+  const BlinkingCard({super.key, required this.child, this.isBlinking = false});
 
   @override
   State<BlinkingCard> createState() => _BlinkingCardState();
@@ -44,7 +43,7 @@ class _BlinkingCardState extends State<BlinkingCard> with SingleTickerProviderSt
       builder: (context, child) {
         return Container(
           decoration: BoxDecoration(
-            color: widget.isBlinking ? Color.lerp(Colors.red.shade200, Colors.red.shade300, _controller.value) : widget.defaultColor,
+            color: widget.isBlinking ? Color.lerp(Colors.red.shade200, Colors.red.shade300, _controller.value) : Colors.white,
           ),
           child: widget.child,
         );

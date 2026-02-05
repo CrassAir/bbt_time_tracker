@@ -36,7 +36,11 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
     _controller = AnimationController(duration: const Duration(milliseconds: 1500), vsync: this);
     _animation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
     _controller.forward();
-    day = getDay(canCreate: true)!;
+    day = getDay()!;
+    startGlobalTimer();
+  }
+
+  void startGlobalTimer() {
     if (day.startWorkDateTime != null) {
       if (day.endWorkDateTime != null) {
         _leftSeconds = day.endWorkDateTime!.difference(day.startWorkDateTime!).inSeconds;
@@ -110,6 +114,15 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
           DateTime.now().isAfter(day.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt())))) {
         stopDay(isSoft: true);
       }
+    }
+    if (DateTime.now().startOfDay!.isAfter(day.createToDate.startOfDay!)) {
+      if (day.endWorkDateTime == null) {
+        stopDay(isSoft: true);
+      }
+      day = getDay(canCreate: true)!;
+      _leftSeconds = 0;
+      setState(() {});
+      startGlobalTimer();
     }
   }
 
@@ -237,7 +250,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
                             ),
                             Text(
                               _leftSeconds <= 0 ? 'start in ${startWorkTime.inSeconds.toHoursMinutes}' : _leftSeconds.toHoursMinutesSeconds,
-                              style: TextStyle(fontSize: 16, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                              style: TextStyle(fontSize: 16, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
                             ),
                             SizedBox(height: 8),
                             Text(
@@ -268,7 +281,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
                                   ? ElevatedButton(
                                       key: ValueKey('3'),
                                       onPressed: startDay,
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow, foregroundColor: Colors.black),
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
                                       child: Text('Resume day'),
                                     )
                                   : ElevatedButton(

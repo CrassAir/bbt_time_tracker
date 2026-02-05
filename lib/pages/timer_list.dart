@@ -131,7 +131,6 @@ class _TimerListState extends State<TimerList> with AutomaticKeepAliveClientMixi
             ),
           ),
           SizedBox(height: 24),
-          Divider(thickness: 1, color: Colors.blue),
           Flexible(
             child: SingleChildScrollView(
               child: Column(
