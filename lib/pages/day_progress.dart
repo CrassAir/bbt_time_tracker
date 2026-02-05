@@ -45,9 +45,9 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
     // objectbox.store.box<WorkDayModel>().removeAll();
     var rawDay = objectbox.store
         .box<WorkDayModel>()
-        .query(WorkDayModel_.createToDate.lessOrEqualDate(DateTime.now().startOfDay!).and(WorkDayModel_.startWorkDateTime.isNull()))
+        .query(WorkDayModel_.createToDate.lessOrEqualDate(DateTime.now().startOfDay!))
         .build()
-        .findFirst();
+        .find().lastOrNull;
     if (rawDay == null) {
       rawDay = WorkDayModel();
       rawDay.createToDate = DateTime.now().startOfDay!;
@@ -58,6 +58,8 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
     if (rawDay.startWorkDateTime != null) {
       if (rawDay.endWorkDateTime != null) {
         _leftSeconds = rawDay.endWorkDateTime!.difference(rawDay.startWorkDateTime!).inSeconds.toDouble();
+      } else {
+        _leftSeconds = DateTime.now().difference(rawDay.startWorkDateTime!).inSeconds.toDouble();
       }
     }
     day = rawDay;

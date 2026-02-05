@@ -155,7 +155,7 @@ class _TimerItemState extends State<TimerItem> {
   }
 
   Color colorByState() {
-    if (!widget.timerModel.isComplete) {
+    if (!widget.timerModel.isComplete && widget.timerModel.startDateTime != null) {
       if (listener == null || !GlobalTimer().isActiveListener(listener!)) {
         return Colors.yellow.shade300;
       }

@@ -100,7 +100,7 @@ class _TimerListState extends State<TimerList> with AutomaticKeepAliveClientMixi
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     SizedBox(
-                      width: 60,
+                      width: 70,
                       child: FormBuilderTextField(
                         name: 'hours',
                         valueTransformer: (value) => int.tryParse(value ?? '0'),
@@ -111,7 +111,7 @@ class _TimerListState extends State<TimerList> with AutomaticKeepAliveClientMixi
                     ),
                     Text(':', style: TextStyle(fontSize: 40)),
                     SizedBox(
-                      width: 60,
+                      width: 70,
                       child: FormBuilderTextField(
                         name: 'minutes',
                         decoration: InputDecoration(label: Text('MM'), border: OutlineInputBorder()),
