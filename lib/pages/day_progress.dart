@@ -101,7 +101,10 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
       }
       if (day.startWorkDateTime != null &&
           day.endWorkDateTime == null &&
-          day.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt())).isAfter(DateTime.now())) {
+          DateTime.now().isAfter(day.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt())))) {
+        print(day.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt())));
+        print(DateTime.now());
+        print('this');
         stopDay(isSoft: true);
       }
     }
@@ -109,7 +112,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
 
   void onTimerTick() {
     calcTime();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   void calcTime() {
