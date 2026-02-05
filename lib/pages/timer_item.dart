@@ -83,6 +83,7 @@ class _TimerItemState extends State<TimerItem> {
       listener = null;
     }
     widget.timerModel.durationLeft = left.value;
+    widget.timerModel.endDateTime = DateTime.now();
     objectbox.store.box<TimerModel>().put(widget.timerModel);
     isActive = false;
     setState(() {});
@@ -348,7 +349,7 @@ class _TimerItemState extends State<TimerItem> {
                                 ),
                               ),
                             ),
-                            tim.branchName == null
+                            tim.branchName == null || tim.branchName!.isEmpty
                                 ? InkWell(
                                     onTap: onSetBranch,
                                     child: Text(

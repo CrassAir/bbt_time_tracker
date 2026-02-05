@@ -25,6 +25,9 @@ class TimerModel {
   @Property(type: PropertyType.dateUtc)
   DateTime? startDateTime;
 
+  @Property(type: PropertyType.dateUtc)
+  DateTime? endDateTime;
+
   bool isComplete = false;
 
   TimerModel({required this.name, this.startDateTime, this.project}) {
