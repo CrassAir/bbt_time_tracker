@@ -55,8 +55,10 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
       // rawDay.endWorkDateTime = rawDay.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt()));
       objectbox.store.box<WorkDayModel>().put(rawDay);
     }
-    if (rawDay.startWorkDateTime != null && rawDay.endWorkDateTime != null) {
-      _leftSeconds = rawDay.endWorkDateTime!.difference(rawDay.startWorkDateTime!).inSeconds.toDouble();
+    if (rawDay.startWorkDateTime != null) {
+      if (rawDay.endWorkDateTime != null) {
+        _leftSeconds = rawDay.endWorkDateTime!.difference(rawDay.startWorkDateTime!).inSeconds.toDouble();
+      }
     }
     day = rawDay;
   }
