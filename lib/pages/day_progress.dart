@@ -68,6 +68,9 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
   }
 
   void startDay({DateTime? startDateTime}) {
+    if (GlobalTimer().dayListener == null) {
+      startGlobalTimer();
+    }
     isRun = true;
     day.startWorkDateTime ??= startDateTime ?? DateTime.now();
     objectbox.store.box<WorkDayModel>().put(day);
@@ -79,6 +82,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
 
   void stopDay({bool isSoft = false}) {
     GlobalTimer().removeAllListeners();
+    GlobalTimer().dayListener = null;
     isRun = false;
     if (isSoft) {
       GlobalTimer.playTimeUpSound();
@@ -101,7 +105,6 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
   }
 
   void dayListener() {
-    if (listener == null || !GlobalTimer().isActiveListener(listener!)) {
       var starWorkDay = DateTime.now().startOfDay!.add(startWorkTime);
       var endWorkDay = starWorkDay.add(Duration(seconds: _totalSeconds.toInt()));
       if (DateTime.now().isAfter(starWorkDay) && DateTime.now().isBefore(endWorkDay) && day.startWorkDateTime == null) {
@@ -113,7 +116,6 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
           DateTime.now().isAfter(day.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt())))) {
         stopDay(isSoft: true);
       }
-    }
     if (DateTime.now().startOfDay!.isAfter(day.createToDate.startOfDay!)) {
       if (day.endWorkDateTime == null) {
         stopDay(isSoft: true);
