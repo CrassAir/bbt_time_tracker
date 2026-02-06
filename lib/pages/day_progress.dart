@@ -79,11 +79,9 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
 
   void stopDay({bool isSoft = false}) {
     GlobalTimer().removeAllListeners();
+    isRun = false;
     if (isSoft) {
-      GlobalTimer().addListener(listener!);
       GlobalTimer.playTimeUpSound();
-    } else {
-      isRun = false;
     }
 
     day.endWorkDateTime = DateTime.now();
