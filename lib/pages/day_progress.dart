@@ -108,6 +108,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
       var endWorkDay = starWorkDay.add(Duration(seconds: _totalSeconds.toInt()));
       if (DateTime.now().isAfter(starWorkDay) && DateTime.now().isBefore(endWorkDay) && day.startWorkDateTime == null) {
         startDay(startDateTime: starWorkDay);
+        GlobalTimer.playStartUpSound();
       }
       if (day.startWorkDateTime != null &&
           day.endWorkDateTime == null &&

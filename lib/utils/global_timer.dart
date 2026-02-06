@@ -81,6 +81,13 @@ class GlobalTimer {
     }
   }
 
+  static Future<void> playStartUpSound() async {
+    try {
+      _player.play(AssetSource('mp3/good_morning_vietnam.mp3'));
+      await windowManager.focus();
+    } catch (e) {}
+  }
+
   void dispose() {
     _player.dispose();
     _timer?.cancel();
