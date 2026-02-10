@@ -136,7 +136,11 @@ class _TimerItemState extends State<TimerItem> {
             child: listener != null && GlobalTimer().isActiveListener(listener!) ? Text('PAUSE') : Text('RESUME'),
           ),
           ElevatedButton(onPressed: stopTimer, child: Text('FINISH')),
-          Text(time.toHoursMinutesSeconds, textAlign: TextAlign.right),
+          Text(
+            time.toHoursMinutesSeconds,
+            textAlign: TextAlign.right,
+            style: TextStyle(color: estimate.value < left.value ? Colors.red : Colors.black),
+          ),
         ],
       );
     }
@@ -160,6 +164,9 @@ class _TimerItemState extends State<TimerItem> {
       if (listener == null || !GlobalTimer().isActiveListener(listener!)) {
         return Colors.orange;
       }
+    }
+    if (estimate.value < left.value) {
+      return Colors.red;
     }
     if (widget.timerModel.isComplete) {
       return Colors.green;
@@ -314,7 +321,10 @@ class _TimerItemState extends State<TimerItem> {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        border: BoxBorder.fromLTRB(right: BorderSide(color: colorByState(), width: 4), left: BorderSide(color: colorByState(), width: 4)),
+        border: BoxBorder.fromLTRB(
+          right: BorderSide(color: colorByState(), width: 4),
+          left: BorderSide(color: colorByState(), width: 4),
+        ),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), offset: Offset(0, 4), blurRadius: 10)],
       ),
       child: BlinkingCard(
