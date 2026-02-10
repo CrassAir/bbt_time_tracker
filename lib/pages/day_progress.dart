@@ -36,7 +36,10 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
     _controller = AnimationController(duration: const Duration(milliseconds: 1500), vsync: this);
     _animation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
     _controller.forward();
-    day = getDay()!;
+    // var findDay = DateTime.now().startOfDay!;
+    // var rday = objectbox.store.box<WorkDayModel>().query(WorkDayModel_.createToDate.lessOrEqualDate(findDay)).build().find();
+    // objectbox.store.box<WorkDayModel>().remove(rday.first.id);
+    day = getWorkDay();
     startGlobalTimer();
   }
 
@@ -51,6 +54,23 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
     calcTime();
 
     GlobalTimer().dayListener = dayListener;
+  }
+
+  WorkDayModel getWorkDay() {
+    var findDay = DateTime.now().startOfDay!;
+    var rawDay = objectbox.store.box<WorkDayModel>().query(WorkDayModel_.createToDate.lessOrEqualDate(findDay)).build().find().lastOrNull;
+    if (rawDay == null) {
+      rawDay = WorkDayModel();
+      rawDay.createToDate = findDay;
+      // rawDay.startWorkDateTime = DateTime.now().startOfDay!.add(startWorkTime);
+      // rawDay.endWorkDateTime = rawDay.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt()));
+      objectbox.store.box<WorkDayModel>().put(rawDay);
+    }
+    if (rawDay.createToDate.startOfDay != findDay) {
+      rawDay.createToDate = findDay;
+      objectbox.store.box<WorkDayModel>().put(rawDay);
+    }
+    return rawDay;
   }
 
   WorkDayModel? getDay({int daysAgo = 0, bool canCreate = false}) {
@@ -72,7 +92,14 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
       startGlobalTimer();
     }
     isRun = true;
-    day.startWorkDateTime ??= startDateTime ?? DateTime.now();
+    day.startWorkDateTime ??= (startDateTime ?? DateTime.now());
+    if (day.startWorkDateTime != null) {
+      if (day.endWorkDateTime != null) {
+        _leftSeconds = day.endWorkDateTime!.difference(day.startWorkDateTime!).inSeconds;
+      } else {
+        _leftSeconds = DateTime.now().difference(day.startWorkDateTime!).inSeconds;
+      }
+    }
     objectbox.store.box<WorkDayModel>().put(day);
     calcTime();
     listener = onTimerTick;
