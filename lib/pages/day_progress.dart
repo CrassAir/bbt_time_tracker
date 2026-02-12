@@ -280,7 +280,12 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
                               _leftSeconds <= 0 ? 'start in ${startWorkTime.inSeconds.toHoursMinutes}' : _leftSeconds.toHoursMinutesSeconds,
                               style: TextStyle(fontSize: 16, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
                             ),
-                            SizedBox(height: 8),
+                            if (isRun && _leftSeconds > 0)
+                            Text(
+                              (_totalSeconds - _leftSeconds).toHoursMinutesSeconds,
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: 4),
                             Text(
                               _spentSeconds > (isOffDay ? _totalSeconds : _leftSeconds) ? 'Free time' : 'Lack of time',
                               style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
