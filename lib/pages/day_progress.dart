@@ -132,17 +132,17 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
   }
 
   void dayListener() {
-      var starWorkDay = DateTime.now().startOfDay!.add(startWorkTime);
-      var endWorkDay = starWorkDay.add(Duration(seconds: _totalSeconds.toInt()));
-      if (DateTime.now().isAfter(starWorkDay) && DateTime.now().isBefore(endWorkDay) && day.startWorkDateTime == null) {
-        startDay(startDateTime: starWorkDay);
-        GlobalTimer.playStartUpSound();
-      }
-      if (day.startWorkDateTime != null &&
-          day.endWorkDateTime == null &&
-          DateTime.now().isAfter(day.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt())))) {
-        stopDay(isSoft: true);
-      }
+    var starWorkDay = DateTime.now().startOfDay!.add(startWorkTime);
+    var endWorkDay = starWorkDay.add(Duration(seconds: _totalSeconds.toInt()));
+    if (DateTime.now().isAfter(starWorkDay) && DateTime.now().isBefore(endWorkDay) && day.startWorkDateTime == null) {
+      startDay(startDateTime: starWorkDay);
+      GlobalTimer.playStartUpSound();
+    }
+    if (day.startWorkDateTime != null &&
+        day.endWorkDateTime == null &&
+        DateTime.now().isAfter(day.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt())))) {
+      stopDay(isSoft: true);
+    }
     if (DateTime.now().startOfDay!.isAfter(day.createToDate.startOfDay!)) {
       if (day.endWorkDateTime == null) {
         stopDay(isSoft: true);
@@ -165,8 +165,7 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
     widget.timers.forEach((el) {
       if (el.isComplete && el.endDateTime?.startOfDay! == day.createToDate.startOfDay!) {
         _spentSeconds += el.estimate.inSeconds;
-      }
-      if (el.isRunning) {
+      } else {
         _spentSeconds += el.durationLeft?.inSeconds ?? 0;
       }
     });
@@ -185,6 +184,8 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
 
   bool get isOffDay =>
       day.startWorkDateTime != null && day.startWorkDateTime!.add(Duration(seconds: _totalSeconds.toInt())).isBefore(DateTime.now());
+
+  int get _curSeconds => isOffDay ? _totalSeconds : _leftSeconds;
 
   @override
   Widget build(BuildContext context) {
@@ -281,17 +282,19 @@ class _MultiLevelCircularProgressState extends State<MultiLevelCircularProgress>
                               style: TextStyle(fontSize: 16, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
                             ),
                             if (isRun && _leftSeconds > 0)
-                            Text(
-                              (_totalSeconds - _leftSeconds).toHoursMinutesSeconds,
-                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-                            ),
+                              Text(
+                                (_totalSeconds - _leftSeconds).toHoursMinutesSeconds,
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                              ),
                             SizedBox(height: 4),
                             Text(
-                              _spentSeconds > (isOffDay ? _totalSeconds : _leftSeconds) ? 'Free time' : 'Lack of time',
+                              _spentSeconds > _curSeconds ? 'Free time' : 'Lack of time',
                               style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
                             ),
                             Text(
-                              (_spentSeconds - (isOffDay ? _totalSeconds : _leftSeconds)).toHoursMinutesSeconds,
+                              _leftSeconds > _spentSeconds
+                                  ? (_curSeconds - _spentSeconds).toHoursMinutesSeconds
+                                  : (_spentSeconds - _curSeconds).toHoursMinutesSeconds,
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
