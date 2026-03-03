@@ -1,21 +1,16 @@
-import 'package:bbt_time_tracker/utils/date_ext.dart';
 import 'package:objectbox/objectbox.dart';
 
 @Entity()
-class WorkDayModel {
+class WorkDay {
   @Id()
   int id = 0;
-  @Transient()
-  Duration debtOfTime = Duration.zero;
 
-  @Transient()
-  Duration freeTime = Duration.zero;
-
-  @Transient()
-  Duration prevWorkTime = Duration.zero;
+  int debtOfTimeMilliseconds = 0;
+  int freeTimeMilliseconds = 0;
+  int prevWorkTimeMilliseconds = 0;
 
   @Property(type: PropertyType.date)
-  DateTime createToDate = DateTime.now().add(Duration(days: 1)).startOfDay!;
+  DateTime createToDate = DateTime.now().add(const Duration(days: 1));
 
   @Property(type: PropertyType.date)
   DateTime? startWorkDateTime;
@@ -23,15 +18,22 @@ class WorkDayModel {
   @Property(type: PropertyType.date)
   DateTime? endWorkDateTime;
 
-  int get debtOfTimeMil => debtOfTime.inMilliseconds;
+  Duration get debtOfTime => Duration(milliseconds: debtOfTimeMilliseconds);
+  set debtOfTime(Duration value) =>
+      debtOfTimeMilliseconds = value.inMilliseconds;
 
-  set debtOfTimeMil(int value) => debtOfTime = Duration(milliseconds: value);
+  Duration get freeTime => Duration(milliseconds: freeTimeMilliseconds);
+  set freeTime(Duration value) => freeTimeMilliseconds = value.inMilliseconds;
 
-  int get freeTimeMil => freeTime.inMilliseconds;
+  Duration get prevWorkTime => Duration(milliseconds: prevWorkTimeMilliseconds);
+  set prevWorkTime(Duration value) =>
+      prevWorkTimeMilliseconds = value.inMilliseconds;
 
-  set freeTimeMil(int value) => freeTime = Duration(milliseconds: value);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WorkDay && runtimeType == other.runtimeType && id == other.id;
 
-  int get prevWorkTimeMil => prevWorkTime.inMilliseconds;
-
-  set prevWorkTimeMil(int value) => prevWorkTime = Duration(milliseconds: value);
+  @override
+  int get hashCode => id.hashCode;
 }

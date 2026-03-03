@@ -5,8 +5,9 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_windows
   objectbox_flutter_libs
-  screen_retriever
+  screen_retriever_windows
   share_plus
+  tray_manager
   url_launcher_windows
   window_manager
   windows_single_instance

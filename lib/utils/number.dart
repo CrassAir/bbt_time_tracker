@@ -2,9 +2,7 @@ import 'dart:math';
 
 extension DurIntExt on int {
   Duration get ms => Duration(milliseconds: this);
-
   Duration get sec => Duration(seconds: this);
-
   Duration get days => Duration(days: this);
 }
 

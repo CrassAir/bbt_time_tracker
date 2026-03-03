@@ -1,11 +1,11 @@
 {
-    "name": "bbt_time_tracker",
-    "short_name": "bbt_time_tracker",
+    "name": "qwen_time_tracker",
+    "short_name": "qwen_time_tracker",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Support for dev",
+    "description": "A new Flutter project.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

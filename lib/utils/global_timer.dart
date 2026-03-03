@@ -1,98 +1,71 @@
 import 'dart:async';
-import 'dart:ui';
-
+import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:window_manager/window_manager.dart';
 
-class GlobalTimer {
+/// Глобальный таймер, который тикает каждую секунду и уведомляет слушателей
+class GlobalTimer extends ChangeNotifier {
   static final GlobalTimer _instance = GlobalTimer._internal();
-  static final AudioPlayer _player = AudioPlayer();
-  static DateTime? isAlarmEnd;
-
   factory GlobalTimer() => _instance;
-
   GlobalTimer._internal();
 
   Timer? _timer;
-  int _seconds = 0;
-  final List<VoidCallback> _listeners = [];
-  final List<VoidCallback> _stopListeners = [];
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
   VoidCallback? dayListener;
 
-  int get seconds => _seconds;
-
-  bool get isRunning => _timer != null;
+  bool _isInitialized = false;
+  bool _isPlaying = false;
 
   void initialize() {
-    if (_timer != null) return;
+    if (_isInitialized) return;
+    _isInitialized = true;
 
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _seconds++;
-      _notifyListeners();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      // Вызываем dayListener для MultiLevelCircularProgress
       dayListener?.call();
+      // Уведомляем всех стандартных слушателей (TimerItem и другие)
+      notifyListeners();
     });
   }
 
-  void addListener(VoidCallback listener) {
-    _listeners.add(listener);
-  }
-
-  void removeListener(VoidCallback listener) {
-    _listeners.remove(listener);
-  }
-
-  void addStopListener(VoidCallback listener) {
-    _stopListeners.add(listener);
-  }
-
-  void removeStopListener(VoidCallback listener) {
-    _stopListeners.remove(listener);
-  }
-
   void removeAllListeners() {
-    _listeners.clear();
-    for (var listener in _stopListeners) {
-      listener();
-    }
+    dayListener = null;
   }
 
-  bool isActiveListener(VoidCallback listener) {
-    return _listeners.contains(listener);
-  }
-
-  void _notifyListeners() {
-    if (isAlarmEnd != null) {
-      if (DateTime.now().isAfter(isAlarmEnd!)) {
-        isAlarmEnd = null;
-      }
-    }
-    for (var listener in _listeners) {
-      listener();
-    }
-  }
-
-  static Future<void> playTimeUpSound() async {
-    if (isAlarmEnd == null) {
-      try {
-        _player.play(AssetSource('mp3/japanese_attention.mp3'));
-        isAlarmEnd = DateTime.now().add(Duration(minutes: 1));
-        await windowManager.focus();
-      } catch (e) {}
-    }
-  }
-
-  static Future<void> playStartUpSound() async {
+  /// Воспроизвести звук начала рабочего дня
+  Future<void> playStartUpSound() async {
+    if (_isPlaying) return;
     try {
-      _player.play(AssetSource('mp3/good_morning_vietnam.mp3'));
-      await windowManager.focus();
-    } catch (e) {}
+      _isPlaying = true;
+      await _audioPlayer.play(AssetSource('mp3/good_morning_vietnam.mp3'));
+      _audioPlayer.onPlayerComplete.listen((_) {
+        _isPlaying = false;
+      });
+    } catch (e) {
+      _isPlaying = false;
+      debugPrint('Error playing startup sound: $e');
+    }
   }
 
+  /// Воспроизвести звук окончания рабочего дня
+  Future<void> playTimeUpSound() async {
+    if (_isPlaying) return;
+    try {
+      _isPlaying = true;
+      await _audioPlayer.play(AssetSource('mp3/japanese_attention.mp3'));
+      _audioPlayer.onPlayerComplete.listen((_) {
+        _isPlaying = false;
+      });
+    } catch (e) {
+      _isPlaying = false;
+      debugPrint('Error playing time up sound: $e');
+    }
+  }
+
+  @override
   void dispose() {
-    _player.dispose();
     _timer?.cancel();
-    _timer = null;
-    _listeners.clear();
-    _stopListeners.clear();
+    _audioPlayer.dispose();
+    super.dispose();
   }
 }

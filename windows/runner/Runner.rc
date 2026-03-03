@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "ru.bbt" "\0"
-            VALUE "FileDescription", "bbt_time_tracker" "\0"
+            VALUE "CompanyName", "com.qwen" "\0"
+            VALUE "FileDescription", "qwen_time_tracker" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "bbt_time_tracker" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 ru.bbt. All rights reserved." "\0"
-            VALUE "OriginalFilename", "bbt_time_tracker.exe" "\0"
-            VALUE "ProductName", "bbt_time_tracker" "\0"
+            VALUE "InternalName", "qwen_time_tracker" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.qwen. All rights reserved." "\0"
+            VALUE "OriginalFilename", "qwen_time_tracker.exe" "\0"
+            VALUE "ProductName", "qwen_time_tracker" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
