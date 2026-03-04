@@ -639,6 +639,87 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
 
+                const SizedBox(height: 12),
+
+                // Баланс дня
+                if (widget.timeTrackerService.currentWorkDay != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: widget.timeTrackerService.todayBalance > Duration.zero
+                        ? Colors.red.shade900.withOpacity(0.2)
+                        : widget.timeTrackerService.todayBalance < Duration.zero
+                          ? Colors.green.shade900.withOpacity(0.2)
+                          : Colors.grey.shade800,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: widget.timeTrackerService.todayBalance > Duration.zero
+                          ? Colors.red.shade700
+                          : widget.timeTrackerService.todayBalance < Duration.zero
+                            ? Colors.green.shade700
+                            : Colors.grey.shade700,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.timeTrackerService.todayBalance > Duration.zero
+                                ? '❌ Задолженность'
+                                : widget.timeTrackerService.todayBalance < Duration.zero
+                                  ? '✅ Свободное время'
+                                  : '⚖️ Баланс',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: widget.timeTrackerService.todayBalance > Duration.zero
+                                  ? Colors.red.shade400
+                                  : widget.timeTrackerService.todayBalance < Duration.zero
+                                    ? Colors.green.shade400
+                                    : Colors.grey.shade400,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Estimate: ${DurationFormatter.format(widget.timeTrackerService.currentWorkDay!.totalEstimate)}',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              widget.timeTrackerService.todayBalance > Duration.zero
+                                ? '+${DurationFormatter.format(widget.timeTrackerService.todayBalance)}'
+                                : DurationFormatter.format(widget.timeTrackerService.todayBalance),
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: widget.timeTrackerService.todayBalance > Duration.zero
+                                  ? Colors.red.shade400
+                                  : widget.timeTrackerService.todayBalance < Duration.zero
+                                    ? Colors.green.shade400
+                                    : Colors.grey.shade400,
+                              ),
+                            ),
+                            if (widget.timeTrackerService.currentWorkDay!.carriedOver > Duration.zero) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                '📤 Перенос: ${DurationFormatter.format(widget.timeTrackerService.currentWorkDay!.carriedOver)}',
+                                style: TextStyle(fontSize: 10, color: Colors.orange.shade400),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 24),
 
                 // Add timer form

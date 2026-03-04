@@ -5,17 +5,36 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/timer.dart';
 import 'package:intl/intl.dart';
+import '../utils/duration_formatter.dart';
 
 class ExportService {
-  static Future<String> exportToExcel(List<Timer> timers) async {
-    if (timers.isEmpty) {
+  /// Экспорт с фильтрацией по периоду (по дате старта)
+  static Future<String> exportToExcel(
+    List<Timer> timers, {
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    // Фильтруем по дате старта если указан период
+    List<Timer> filtered = timers;
+    if (from != null || to != null) {
+      filtered = timers.where((t) {
+        final start = t.startDateTime;
+        if (start == null) return false;
+        if (from != null && start.isBefore(from)) return false;
+        if (to != null && start.isAfter(to)) return false;
+        return true;
+      }).toList();
+    }
+
+    if (filtered.isEmpty) {
       throw Exception('Нет данных для экспорта');
     }
 
     final excel = Excel.createExcel();
     final sheet = excel['Timer Report'];
 
-    final headers = ['Status', 'Name', 'Created', 'Start', 'End', 'Estimate', 'Duration Left', 'Project', 'URL'];
+    // Заголовки с балансом
+    final headers = ['Status', 'Name', 'Created', 'Start', 'End', 'Estimate', 'Spent', 'Balance', 'Project', 'URL'];
 
     for (int i = 0; i < headers.length; i++) {
       final cellIndex = CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0);
@@ -24,10 +43,35 @@ class ExportService {
       cell.cellStyle = CellStyle(bold: true, backgroundColorHex: ExcelColor.blue100);
     }
 
-    for (final timer in timers) {
+    // Данные
+    for (final timer in filtered) {
       final row = timer.toExportMap().values.map((e) => TextCellValue(e.toString())).toList();
       sheet.appendRow(row);
     }
+
+    // Итоговая строка
+    sheet.appendRow([]);
+    final totalEstimate = filtered.fold<Duration>(Duration.zero, (sum, t) => sum + t.estimate);
+    final totalSpent = filtered.fold<Duration>(Duration.zero, (sum, t) => sum + (t.durationLeft ?? Duration.zero));
+    final totalBalance = totalEstimate - totalSpent;
+    
+    final balanceText = totalBalance > Duration.zero
+      ? '+${DurationFormatter.format(totalBalance)}'
+      : DurationFormatter.format(totalBalance);
+
+    sheet.appendRow([
+      TextCellValue('ИТОГО'),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(DurationFormatter.format(totalEstimate)),
+      TextCellValue(DurationFormatter.format(totalSpent)),
+      TextCellValue(balanceText),
+      TextCellValue(''),
+      TextCellValue(''),
+    ]);
+
     excel.delete(excel.getDefaultSheet()!);
     excel.setDefaultSheet(sheet.sheetName);
 
@@ -63,7 +107,12 @@ extension TimerExport on Timer {
   Map<String, dynamic> toExportMap() {
     final dateFormat = DateFormat('dd.MM.yyyy');
     final timeFormat = DateFormat('dd.MM.yyyy HH:mm');
-    
+    final spent = durationLeft ?? Duration.zero;
+    final balance = estimate - spent;
+    final balanceText = balance > Duration.zero
+      ? '+${DurationFormatter.format(balance)}'
+      : DurationFormatter.format(balance);
+
     return {
       'Status': isRunning ? 'Running' : (isComplete ? 'Completed' : 'Pending'),
       'Name': name,
@@ -72,19 +121,11 @@ extension TimerExport on Timer {
       'End': isComplete && startDateTime != null
           ? timeFormat.format(startDateTime!.add(durationLeft ?? Duration.zero).toLocal())
           : '-',
-      'Estimate': _formatDuration(estimate),
-      'Duration Left': _formatDuration(durationLeft ?? Duration.zero),
+      'Estimate': DurationFormatter.format(estimate),
+      'Spent': DurationFormatter.format(spent),
+      'Balance': balanceText,
       'Project': project ?? '-',
       'URL': url ?? '-',
     };
-  }
-
-  String _formatDuration(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    final s = d.inSeconds % 60;
-    if (h > 0) return '${h}h ${m}m ${s}s';
-    if (m > 0) return '${m}m ${s}s';
-    return '${s}s';
   }
 }
