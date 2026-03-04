@@ -62,6 +62,7 @@ class _AppShellState extends State<AppShell> {
     _botService = TelegramBotService(
       qwen: _qwenService,
       projectService: _projectService,
+      timeTrackerService: _timeTrackerService,
     );
     _init();
     _setupIpcListener();

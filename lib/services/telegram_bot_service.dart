@@ -10,11 +10,13 @@ import '../utils/duration_formatter.dart';
 import 'qwen_code_service.dart';
 import 'log_service.dart';
 import 'project_service.dart';
+import 'time_tracker_service.dart';
 
 class TelegramBotService extends ChangeNotifier {
   Bot? _bot;
   final QwenCodeService qwen;
-  ProjectService? projectService;
+  final ProjectService? projectService;
+  final TimeTrackerService? timeTrackerService;
   Set<int> allowedUserIds;
   bool _isRunning = false;
   int _messageCount = 0;
@@ -22,6 +24,13 @@ class TelegramBotService extends ChangeNotifier {
   final _log = LogService();
   late final io.Directory _mediaDir;
   BotSettings? _settings;
+
+  TelegramBotService({
+    required this.qwen,
+    this.projectService,
+    this.timeTrackerService,
+    Set<int>? allowedUserIds,
+  }) : allowedUserIds = allowedUserIds ?? {};
 
   /// Загрузка настроек
   Future<void> loadSettings() async {
@@ -125,15 +134,6 @@ class TelegramBotService extends ChangeNotifier {
   /// Rate limit: max messages per user per minute.
   static const int _rateLimitPerMinute = 10;
   final Map<int, List<DateTime>> _userMessageTimes = {};
-
-  TelegramBotService({
-    required this.qwen,
-    this.projectService,
-    Set<int>? allowedUserIds,
-  }) : allowedUserIds = allowedUserIds ?? {} {
-    final home = io.Platform.environment['HOME'] ?? '/tmp';
-    _mediaDir = io.Directory(p.join(home, 'qwen-bot-media'));
-  }
 
   bool get isRunning => _isRunning;
   int get messageCount => _messageCount;
@@ -740,7 +740,7 @@ class TelegramBotService extends ChangeNotifier {
       buf.writeln('Qwen: ${qwen.isRunning ? "Running" : "Stopped"}');
       buf.writeln('Model: ${qwen.isLocalModel ? "🖥 Local (config)" : "☁️ Cloud (config)"}');
       buf.writeln('Ollama: ${qwen.ollamaAvailable ? "✅ Available" : "❌ Not available"}');
-      
+
       // Получаем имя текущей модели
       try {
         final modelName = await qwen.getCurrentModelName();
@@ -748,7 +748,7 @@ class TelegramBotService extends ChangeNotifier {
           buf.writeln('Current model: $modelName');
         }
       } catch (_) {}
-      
+
       buf.writeln('Messages: $_messageCount');
       final proj = projectService?.activeProject;
       if (proj != null) {
@@ -763,6 +763,39 @@ class TelegramBotService extends ChangeNotifier {
         buf.writeln('Session: ${qwen.currentSessionId}');
       }
       await ctx.reply(buf.toString());
+    });
+
+    // ─── /day — Информация о рабочем дне ───
+    _bot!.command('day', (ctx) async {
+      if (!_isAllowed(ctx)) return;
+      
+      final day = timeTrackerService?.currentWorkDay;
+      if (day == null) {
+        await ctx.reply('ℹ️ Рабочий день ещё не начат');
+        return;
+      }
+
+      final balance = day.balance;
+      final balanceText = balance > Duration.zero
+        ? '❌ Задолженность: ${DurationFormatter.format(balance)}'
+        : balance < Duration.zero
+          ? '✅ Свободное время: ${DurationFormatter.format(-balance)}'
+          : '⚖️ Баланс';
+
+      final carriedOverText = day.carriedOver > Duration.zero
+        ? '\n📤 Перенос на завтра: ${DurationFormatter.format(day.carriedOver)}'
+        : '';
+
+      await ctx.reply(
+        '📊 *Рабочий день*\n\n'
+        '📅 Дата: ${day.createToDate.toLocal().toString().split(' ').first}\n'
+        '⏱ Estimate: ${DurationFormatter.format(day.totalEstimate)}\n'
+        '🕐 Spent: ${DurationFormatter.format(day.totalSpent)}\n'
+        '📥 С прошлого дня: ${DurationFormatter.format(day.prevWorkTime)}'
+        '$carriedOverText\n\n'
+        '*$balanceText*',
+        parseMode: ParseMode.markdown,
+      );
     });
 
     // ─── /quota ───
