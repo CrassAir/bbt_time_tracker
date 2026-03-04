@@ -21,6 +21,18 @@ class BotSettings {
   bool autoStartLocalModel;  // Автозапуск локальной модели при старте
   bool autoStartOllama;  // Автозапуск Ollama сервера при старте
 
+  // === НАСТРОЙКИ РАБОЧЕГО ДНЯ ===
+  int workDayStartHour;           // Время старта (по умолчанию 11:00)
+  int workDayDurationHours;       // Продолжительность (по умолчанию 8 часов)
+  bool autoStartDay;              // Авто-старт дня
+  bool autoStopDay;               // Авто-стоп дня
+
+  // === ЗВУКОВЫЕ УВЕДОМЛЕНИЯ ===
+  String? dayStartSoundPath;              // Путь к MP3: старт дня
+  String? dayEndSoundPath;                // Путь к MP3: завершение дня
+  String? taskEndingSoonSoundPath;        // Путь к MP3: окончание задачи (<60 сек)
+  int taskEndingSoonSeconds;              // За сколько секунд предупреждать
+
   BotSettings({
     this.telegramBotToken = '',
     List<int>? allowedUserIds,
@@ -36,6 +48,14 @@ class BotSettings {
     this.ollamaModel = 'qwen2.5-coder:7b-instruct-q4_K_M',
     this.autoStartLocalModel = false,
     this.autoStartOllama = false,
+    this.workDayStartHour = 11,
+    this.workDayDurationHours = 8,
+    this.autoStartDay = true,
+    this.autoStopDay = true,
+    this.dayStartSoundPath,
+    this.dayEndSoundPath,
+    this.taskEndingSoonSoundPath,
+    this.taskEndingSoonSeconds = 60,
   })  : allowedUserIds = allowedUserIds ?? [],
         workingDirectory = workingDirectory ?? _defaultWorkingDir;
 
@@ -66,6 +86,22 @@ class BotSettings {
     // Настройки нейросетей
     await prefs.setString('ollama_model', ollamaModel);
     await prefs.setBool('auto_start_local_model', autoStartLocalModel);
+    // Настройки рабочего дня
+    await prefs.setInt('work_day_start_hour', workDayStartHour);
+    await prefs.setInt('work_day_duration_hours', workDayDurationHours);
+    await prefs.setBool('auto_start_day', autoStartDay);
+    await prefs.setBool('auto_stop_day', autoStopDay);
+    // Звуковые уведомления
+    if (dayStartSoundPath != null) {
+      await prefs.setString('day_start_sound', dayStartSoundPath!);
+    }
+    if (dayEndSoundPath != null) {
+      await prefs.setString('day_end_sound', dayEndSoundPath!);
+    }
+    if (taskEndingSoonSoundPath != null) {
+      await prefs.setString('task_ending_soon_sound', taskEndingSoonSoundPath!);
+    }
+    await prefs.setInt('task_ending_soon_seconds', taskEndingSoonSeconds);
   }
 
   static Future<BotSettings> load() async {
@@ -90,6 +126,16 @@ class BotSettings {
       // Настройки нейросетей
       ollamaModel: prefs.getString('ollama_model') ?? 'qwen2.5-coder:7b-instruct-q4_K_M',
       autoStartLocalModel: prefs.getBool('auto_start_local_model') ?? false,
+      // Настройки рабочего дня
+      workDayStartHour: prefs.getInt('work_day_start_hour') ?? 11,
+      workDayDurationHours: prefs.getInt('work_day_duration_hours') ?? 8,
+      autoStartDay: prefs.getBool('auto_start_day') ?? true,
+      autoStopDay: prefs.getBool('auto_stop_day') ?? true,
+      // Звуковые уведомления
+      dayStartSoundPath: prefs.getString('day_start_sound'),
+      dayEndSoundPath: prefs.getString('day_end_sound'),
+      taskEndingSoonSoundPath: prefs.getString('task_ending_soon_sound'),
+      taskEndingSoonSeconds: prefs.getInt('task_ending_soon_seconds') ?? 60,
     );
   }
 }

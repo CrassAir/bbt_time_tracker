@@ -354,7 +354,7 @@ class CliService {
     await _ipc.sendDayStopped();
 
     stdout.writeln('⏹ Work day stopped');
-    stdout.writeln('  Duration: ${DurationFormatter.format(_timeTracker.todayWorkDuration)}');
+    stdout.writeln('  Duration: ${DurationFormatter.format(_timeTracker.todayWorkDuration ?? Duration.zero)}');
     _log.info('CLI: Work day stopped');
   }
 

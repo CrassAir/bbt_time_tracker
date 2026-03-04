@@ -62,6 +62,23 @@ class GlobalTimer extends ChangeNotifier {
     }
   }
 
+  /// Воспроизвести пользовательский звук из файла
+  Future<void> playCustomSound(String filePath) async {
+    if (_isPlaying) return;
+    try {
+      _isPlaying = true;
+      await _audioPlayer.play(DeviceFileSource(filePath));
+      _audioPlayer.onPlayerComplete.listen((_) {
+        _isPlaying = false;
+      });
+    } catch (e) {
+      _isPlaying = false;
+      debugPrint('Error playing custom sound: $e');
+      // Fallback на стандартный звук
+      playTimeUpSound();
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel();

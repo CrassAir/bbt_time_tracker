@@ -4,6 +4,7 @@ import 'dart:io';
 import '../objectbox.g.dart';
 import '../models/timer.dart';
 import '../models/work_day.dart';
+import '../utils/date_ext.dart';
 
 class ObjectBoxService {
   static final ObjectBoxService _instance = ObjectBoxService._internal();
@@ -41,7 +42,33 @@ class ObjectBoxService {
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final allWorkDays = workDayBox.getAll();
+    for (final wd in allWorkDays) {
+      if (wd.createToDate.isAfter(startOfDay) && wd.createToDate.isBefore(endOfDay)) {
+        return wd;
+      }
+    }
+    return null;
+  }
+
+  /// Получить предыдущий рабочий день
+  WorkDay? getPreviousWorkDay(DateTime date) {
+    final allWorkDays = workDayBox.getAll();
+    final dateStartOfDay = date.startOfDay ?? date;
+    final result = allWorkDays
+      .where((d) => d.createToDate.isBefore(dateStartOfDay))
+      .toList()
+      ..sort((a, b) => b.createToDate.compareTo(a.createToDate));
     
+    return result.firstOrNull;
+  }
+
+  /// Получить рабочий день по дате
+  WorkDay? getWorkDayByDate(DateTime date) {
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
     final allWorkDays = workDayBox.getAll();
     for (final wd in allWorkDays) {
       if (wd.createToDate.isAfter(startOfDay) && wd.createToDate.isBefore(endOfDay)) {
