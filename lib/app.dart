@@ -9,6 +9,7 @@ import 'services/telegram_bot_service.dart';
 import 'services/tray_service.dart';
 import 'services/single_instance_service.dart';
 import 'services/time_tracker_service.dart';
+import 'services/app_directory_service.dart';
 import 'widgets/sidebar.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/history_screen.dart';
@@ -83,12 +84,53 @@ class _AppShellState extends State<AppShell> {
       await _projectService.load();
       await _timeTrackerService.load();
 
+      // Определяем директорию приложения и копируем QWEN.md
+      final appDirectory = await AppDirectoryService().getAppDirectory();
+      _log.info('App directory: $appDirectory');
+      
+      // Копируем QWEN.md в дирекрию приложения если нет
+      await AppDirectoryService().copyQwenContextToAppDirectory();
+      _log.info('QWEN.md context copied: ${await AppDirectoryService().hasQwenContext()}');
+
       _qwenService.configure(
         cliPath: _settings.qwenCliPath,
-        workingDir: _settings.workingDirectory,
+        workingDir: appDirectory,  // Используем директорию приложения
         useYoloMode: _settings.useYoloMode,
       );
       _botService.allowedUserIds = _settings.allowedUserIds.toSet();
+
+      // Инициализируем сервис конфигураций и синхронизируем модель
+      await _qwenService.initialize();
+
+      // Проверяем доступность Ollama
+      await _qwenService.checkOllamaAvailability();
+
+      // Автозапуск локальной модели если включено в настройках
+      if (_settings.autoStartLocalModel && _qwenService.ollamaAvailable) {
+        _log.info('Auto-starting local model: ${_settings.ollamaModel}');
+        try {
+          final availableModels = await _qwenService.getAvailableModels();
+          final localModel = availableModels.firstWhere(
+            (m) => m['id'] == _settings.ollamaModel ||
+                   m['id']!.contains(_settings.ollamaModel.split(':').first),
+            orElse: () => availableModels.firstWhere(
+              (m) => m['id']!.contains('qwen2.5'),
+              orElse: () => availableModels.first,
+            ),
+          );
+          await _qwenService.switchModel(localModel['id']!);
+
+          // Проверяем и запускаем модель
+          final modelStarted = await _qwenService.configService.checkAndStartModelByName(localModel['id']!);
+          if (modelStarted) {
+            _log.info('Local model auto-started successfully: ${localModel['id']}');
+          } else {
+            _log.warn('Local model auto-start failed: ${_qwenService.configService.ollamaModelError}');
+          }
+        } catch (e) {
+          _log.error('Error auto-starting local model: $e');
+        }
+      }
 
       await _trayService.init();
       _trayService.onStartBot = _startBot;
@@ -188,7 +230,9 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  Future<void> _quitApp() async {
+  /// Универсальная очистка ресурсов
+  Future<void> _cleanup() async {
+    _qwenService.removeListener(_onQwenSessionChanged);
     await _stopBot();
     await _trayService.destroy();
     _qwenService.dispose();
@@ -197,7 +241,10 @@ class _AppShellState extends State<AppShell> {
     _timeTrackerService.dispose();
     await _log.dispose();
     await SingleInstanceService().dispose();
+  }
 
+  Future<void> _quitApp() async {
+    await _cleanup();
     await windowManager.setPreventClose(false);
     await windowManager.close();
     exit(0);
@@ -205,15 +252,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
-    _qwenService.removeListener(_onQwenSessionChanged);
-    _stopBot();
-    _trayService.destroy();
-    _qwenService.dispose();
-    _botService.dispose();
-    _projectService.dispose();
-    _timeTrackerService.dispose();
-    _log.dispose();
-    SingleInstanceService().dispose();
+    _cleanup(); // dispose не может быть async, поэтому игнорируем Future
     super.dispose();
   }
 
@@ -255,6 +294,7 @@ class _AppShellState extends State<AppShell> {
             return DashboardScreen(
               timeTrackerService: _timeTrackerService,
               projectService: _projectService,
+              qwenService: _qwenService,
               onStartBot: _startBot,
               onStopBot: _stopBot,
               botRunning: _botService.isRunning,

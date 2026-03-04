@@ -3,6 +3,14 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../services/log_service.dart';
+import '../services/qwen_config_service.dart';
+import '../models/bot_settings.dart';
+
+/// Тип текущей активной модели
+enum ActiveModelType {
+  local,    // Ollama
+  cloud,    // Qwen Code CLI
+}
 
 class QwenCodeService extends ChangeNotifier {
   String? _currentSessionId;
@@ -17,11 +25,43 @@ class QwenCodeService extends ChangeNotifier {
   bool _systemPromptSent = false;
   final _log = LogService();
   Process? _activeProcess;
+  
+  // Сервис управления конфигурациями
+  final _configService = QwenConfigService();
+  
+  // Поддержка двух типов моделей
+  ActiveModelType _activeModelType = ActiveModelType.cloud;
+  bool _ollamaAvailable = false;
 
   bool get isRunning => _isRunning;
   bool get isBusy => _isBusy;
   String? get currentSessionId => _currentSessionId;
   DateTime? get sessionStartTime => _sessionStartTime;
+  ActiveModelType get activeModelType => _activeModelType;
+  bool get isLocalModel => _activeModelType == ActiveModelType.local;
+  bool get isCloudModel => _activeModelType == ActiveModelType.cloud;
+  bool get ollamaAvailable => _ollamaAvailable;
+  QwenConfigService get configService => _configService;
+
+  /// Запустить Ollama сервер
+  Future<bool> startOllama() async {
+    return await _configService.startOllama();
+  }
+
+  /// Остановить Ollama сервер
+  Future<bool> stopOllama() async {
+    return await _configService.stopOllama();
+  }
+
+  /// Проверить и запустить модель
+  Future<bool> checkAndStartModel() async {
+    return await _configService.checkAndStartModel();
+  }
+
+  /// Остановить модель (выгрузить из памяти)
+  Future<bool> stopModel() async {
+    return await _configService.stopModel();
+  }
 
   Duration get sessionDuration {
     if (_sessionStartTime == null) return Duration.zero;
@@ -38,6 +78,60 @@ class QwenCodeService extends ChangeNotifier {
     _workingDirectory = workingDir;
     if (systemPrompt != null) _systemPrompt = systemPrompt;
     if (useYoloMode != null) _useYoloMode = useYoloMode;
+  }
+
+  /// Инициализировать сервис
+  Future<void> initialize() async {
+    await _configService.initialize();
+    await checkOllamaAvailability();
+    
+    // Синхронизируем тип модели с конфигурацией
+    _activeModelType = _configService.isLocalModel ? ActiveModelType.local : ActiveModelType.cloud;
+    notifyListeners();
+  }
+
+  /// Проверить доступность Ollama
+  Future<void> checkOllamaAvailability() async {
+    try {
+      final result = await Process.run('ollama', ['list'], runInShell: true);
+      _ollamaAvailable = result.exitCode == 0;
+      _log.info('Ollama available: $_ollamaAvailable');
+      notifyListeners();
+    } catch (e) {
+      _ollamaAvailable = false;
+      _log.error('Ollama not available: $e');
+      notifyListeners();
+    }
+  }
+
+  /// Переключить модель по ID
+  Future<void> switchModel(String modelId) async {
+    final success = await _configService.switchModel(modelId);
+    if (success) {
+      // Обновляем тип активной модели
+      _activeModelType = _configService.isLocalModel ? ActiveModelType.local : ActiveModelType.cloud;
+      
+      // Сбрасываем сессию и useContinue, чтобы новая модель использовалась с начала
+      _currentSessionId = null;
+      _useContinue = false;
+      _systemPromptSent = false;
+      
+      _log.info('Switched to model: $modelId (${_activeModelType == ActiveModelType.local ? "LOCAL" : "CLOUD"})');
+      _log.info('Session reset - new model will be used from next request');
+      notifyListeners();
+    } else {
+      throw Exception('Failed to switch model');
+    }
+  }
+
+  /// Получить список доступных моделей
+  Future<List<Map<String, String>>> getAvailableModels() async {
+    return await _configService.getAvailableModels();
+  }
+
+  /// Получить текущую модель из конфигурации
+  Future<String?> getCurrentModelName() async {
+    return await _configService.getCurrentModelName();
   }
 
   Future<String> _resolveCliPath() async {
@@ -121,8 +215,17 @@ class QwenCodeService extends ChangeNotifier {
     final cli = await _resolveCliPath();
     final wd = _workingDirectory;
 
+    // Получаем текущую модель из конфигурации
+    final currentModel = await _configService.getCurrentModelName();
+
     final args = <String>['-p'];
     if (_useYoloMode) args.add('-y');
+    
+    // Передаём модель явно через флаг -m
+    if (currentModel != null && currentModel.isNotEmpty) {
+      args.addAll(['-m', currentModel]);
+    }
+    
     args.addAll(['--output-format', 'stream-json', '--include-partial-messages']);
 
     if (_currentSessionId != null && _currentSessionId!.isNotEmpty) {
@@ -138,7 +241,7 @@ class QwenCodeService extends ChangeNotifier {
     }
     args.add(finalMessage);
 
-    _log.info('Running (stream): $cli ${args.join(" ")}');
+    _log.info('Running (stream): $cli ${args.join(" ")} [model: $currentModel]');
 
     if (wd.isNotEmpty && !await Directory(wd).exists()) {
       _log.error('Working directory does not exist: $wd');
@@ -245,8 +348,17 @@ class QwenCodeService extends ChangeNotifier {
     final cli = await _resolveCliPath();
     final wd = _workingDirectory;
 
+    // Получаем текущую модель из конфигурации
+    final currentModel = await _configService.getCurrentModelName();
+
     final args = <String>['-p'];
     if (_useYoloMode) args.add('-y');
+    
+    // Передаём модель явно через флаг -m
+    if (currentModel != null && currentModel.isNotEmpty) {
+      args.addAll(['-m', currentModel]);
+    }
+    
     args.addAll(['--output-format', 'json']);
 
     if (_currentSessionId != null && _currentSessionId!.isNotEmpty) {
@@ -261,6 +373,8 @@ class QwenCodeService extends ChangeNotifier {
       _systemPromptSent = true;
     }
     args.add(finalMessage);
+
+    _log.info('Running: $cli ${args.join(" ")} [model: $currentModel]');
 
     final result = await Process.run(cli, args, workingDirectory: wd, environment: Platform.environment, runInShell: true);
     final exitCode = result.exitCode;

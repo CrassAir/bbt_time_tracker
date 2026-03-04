@@ -66,3 +66,4 @@ flutter:
   assets:
     - assets/
     - assets/mp3/
+    - QWEN.md

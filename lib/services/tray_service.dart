@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
+import '../services/log_service.dart';
 
 typedef VoidAsyncCallback = Future<void> Function();
 
 class TrayService implements TrayListener {
+  final _log = LogService();
   bool _isInitialized = false;
 
   VoidAsyncCallback? onStartBot;
@@ -75,10 +77,16 @@ class TrayService implements TrayListener {
     try {
       String? iconPath;
 
+      // Для Windows используем абсолютный путь к данным приложения
       if (Platform.isWindows) {
+        // Путь к данным Flutter приложения
+        final appDataPath = path.dirname(Platform.resolvedExecutable);
+        final flutterAssetsPath = path.join(appDataPath, 'data', 'flutter_assets');
+        
         final icoPaths = [
-          'assets/tray_icon.ico',
+          path.join(flutterAssetsPath, 'assets', 'tray_icon.ico'),
           path.join(Directory.current.path, 'assets', 'tray_icon.ico'),
+          'assets/tray_icon.ico',
         ];
         for (final p in icoPaths) {
           if (await File(p).exists()) {
@@ -90,8 +98,8 @@ class TrayService implements TrayListener {
 
       if (iconPath == null) {
         final pngPaths = [
-          'assets/tray_icon.png',
           path.join(Directory.current.path, 'assets', 'tray_icon.png'),
+          'assets/tray_icon.png',
         ];
         for (final p in pngPaths) {
           if (await File(p).exists()) {
@@ -103,10 +111,13 @@ class TrayService implements TrayListener {
 
       if (iconPath != null) {
         await trayManager.setIcon(iconPath, isTemplate: false);
+        _log.info('Tray icon set: $iconPath');
       } else {
         await trayManager.setIcon('');
+        _log.warn('Tray icon not found');
       }
     } catch (e) {
+      _log.error('Error setting tray icon: $e');
       await trayManager.setIcon('');
     }
   }

@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:io' as io;
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:televerse/televerse.dart';
 import 'package:televerse/telegram.dart';
 import '../models/chat_message.dart';
 import '../models/bot_settings.dart';
+import '../utils/duration_formatter.dart';
 import 'qwen_code_service.dart';
 import 'log_service.dart';
 import 'project_service.dart';
@@ -40,9 +40,9 @@ class TelegramBotService extends ChangeNotifier {
           ChatID(userId),
           '⏱ *Таймер завершён*\n\n'
           '📝 Задача: $taskName\n'
-          '⏱ План: ${_formatDuration(estimate)}\n'
-          '🕐 Факт: ${_formatDuration(actual)}\n'
-          '${actual > estimate ? '❌ Превышение: ${_formatDuration(actual - estimate)}' : '✅ Уложились в время!'}',
+          '⏱ План: ${DurationFormatter.format(estimate)}\n'
+          '🕐 Факт: ${DurationFormatter.format(actual)}\n'
+          '${actual > estimate ? '❌ Превышение: ${DurationFormatter.format(actual - estimate)}' : '✅ Уложились в время!'}',
           parseMode: ParseMode.markdown,
         );
       } catch (e) {
@@ -62,7 +62,7 @@ class TelegramBotService extends ChangeNotifier {
         await _bot!.api.sendMessage(
           ChatID(userId),
           '🏁 *Рабочий день завершён*\n\n'
-          '🕐 Длительность: ${_formatDuration(duration)}\n'
+          '🕐 Длительность: ${DurationFormatter.format(duration)}\n'
           '✅ Завершено задач: $completedTasks\n\n'
           'Хорошего отдыха! 🌙',
           parseMode: ParseMode.markdown,
@@ -85,9 +85,9 @@ class TelegramBotService extends ChangeNotifier {
           ChatID(userId),
           '⚠️ *Превышение времени*\n\n'
           '📝 Задача: $taskName\n'
-          '⏱ План: ${_formatDuration(estimate)}\n'
-          '🕐 Факт: ${_formatDuration(actual)}\n'
-          '❌ Превышение: ${_formatDuration(actual - estimate)}',
+          '⏱ План: ${DurationFormatter.format(estimate)}\n'
+          '🕐 Факт: ${DurationFormatter.format(actual)}\n'
+          '❌ Превышение: ${DurationFormatter.format(actual - estimate)}',
           parseMode: ParseMode.markdown,
         );
       } catch (e) {
@@ -120,15 +120,6 @@ class TelegramBotService extends ChangeNotifier {
         _log.error('Failed to send end day reminder: $e');
       }
     }
-  }
-
-  /// Форматирование длительности
-  String _formatDuration(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    if (h > 0) return '$h ч ${m} м';
-    if (m > 0) return '$m м';
-    return '${d.inSeconds} с';
   }
 
   /// Rate limit: max messages per user per minute.
@@ -384,6 +375,8 @@ class TelegramBotService extends ChangeNotifier {
       BotCommand(command: 'newproject', description: 'Создать проект'),
       BotCommand(command: 'switch', description: 'Переключить проект'),
       BotCommand(command: 'newsession', description: 'Новая сессия'),
+      BotCommand(command: 'model', description: 'Переключить модель'),
+      BotCommand(command: 'ollama', description: 'Управление Ollama'),
       BotCommand(command: 'compact', description: 'Сжать контекст'),
       BotCommand(command: 'status', description: 'Статус системы'),
       BotCommand(command: 'quota', description: 'Проверить квоту API'),
@@ -453,7 +446,8 @@ class TelegramBotService extends ChangeNotifier {
         buf.writeln('${i + 1}. ${proj.name}$active');
         buf.writeln('   ${proj.workingDirectory}');
         if (proj.sessionId != null) {
-          buf.writeln('   Session: ${proj.sessionId!.substring(0, min(12, proj.sessionId!.length))}');
+          final len = proj.sessionId!.length < 12 ? proj.sessionId!.length : 12;
+          buf.writeln('   Session: ${proj.sessionId!.substring(0, len)}');
         }
         buf.writeln();
       }
@@ -542,10 +536,11 @@ class TelegramBotService extends ChangeNotifier {
 
       if (project.sessionId != null) {
         await qwen.resumeSession(project.sessionId!);
+        final len = project.sessionId!.length < 12 ? project.sessionId!.length : 12;
         await ctx.reply(
           'Проект: ${project.name}\n'
           'Dir: ${project.workingDirectory}\n'
-          'Session resumed: ${project.sessionId!.substring(0, min(12, project.sessionId!.length))}',
+          'Session resumed: ${project.sessionId!.substring(0, len)}',
         );
       } else {
         await qwen.continueLastSession();
@@ -574,6 +569,158 @@ class TelegramBotService extends ChangeNotifier {
       }
     });
 
+    // ─── /model — Переключить модель ───
+    _bot!.command('model', (ctx) async {
+      if (!_isAllowed(ctx)) return;
+
+      final text = ctx.message?.text ?? '';
+      final args = text.split(' ').skip(1).toList();
+
+      if (args.isEmpty) {
+        // Показать текущую модель и доступные
+        final currentModel = await qwen.getCurrentModelName();
+        final availableModels = await qwen.configService.getAvailableModels();
+        final ollamaRunning = qwen.configService.ollamaRunning;
+
+        String modelsList = 'Нет доступных моделей';
+        if (availableModels.isNotEmpty) {
+          modelsList = availableModels.map((m) {
+            final isCurrent = m['id'] == currentModel;
+            final icon = isCurrent ? '✅' : '  ';
+            return '$icon *${m['name']}* (`${m['id']}`)';
+          }).join('\n');
+        }
+
+        await ctx.reply(
+          '📊 *Текущая модель:* `$currentModel`\n\n'
+          '📋 *Доступные модели:*\n$modelsList\n\n'
+          'Ollama: ${ollamaRunning ? "✅ Запущена" : qwen.ollamaAvailable ? "⏸ Остановлена" : "❌ Не установлена"}\n\n'
+          'Использование:\n'
+          '`/model <model_id>` — переключить модель\n'
+          '`/model list` — показать список\n'
+          '`/model local` — локальная (Ollama)\n'
+          '`/model cloud` — облачная (OAuth)\n'
+          '`/model stop` — остановить модель (выгрузить из памяти)',
+          parseMode: ParseMode.markdown,
+        );
+        return;
+      }
+
+      final command = args.first.toLowerCase();
+
+      switch (command) {
+        case 'list':
+        case 'ls':
+        case 'l':
+          // Показать список моделей
+          final currentModel = await qwen.getCurrentModelName();
+          final availableModels = await qwen.configService.getAvailableModels();
+          
+          String modelsList = 'Нет доступных моделей';
+          if (availableModels.isNotEmpty) {
+            modelsList = availableModels.map((m) {
+              final isCurrent = m['id'] == currentModel;
+              final icon = isCurrent ? '✅' : '  ';
+              final desc = m['description']!.isNotEmpty ? ' — ${m['description']}' : '';
+              return '$icon *${m['name']}* (`${m['id']}`)$desc';
+            }).join('\n');
+          }
+
+          await ctx.reply(
+            '📋 *Доступные модели:*\n$modelsList',
+            parseMode: ParseMode.markdown,
+          );
+          break;
+
+        case 'cloud':
+        case 'c':
+          try {
+            final availableModels = await qwen.configService.getAvailableModels();
+            // Находим облачную модель (не содержащую qwen2.5, ollama, localhost)
+            final cloudModel = availableModels.firstWhere(
+              (m) => !m['id']!.contains('qwen2.5') && 
+                     !m['id']!.contains('ollama') && 
+                     !m['id']!.contains('localhost'),
+              orElse: () => throw Exception('Облачная модель не найдена'),
+            );
+            await qwen.configService.switchModel(cloudModel['id']!);
+            await ctx.reply('✅ Переключено на ☁️ ОБЛАЧНУЮ модель: *${cloudModel['name']}*', parseMode: ParseMode.markdown);
+          } catch (e) {
+            await ctx.reply('❌ Error: $e');
+          }
+          break;
+
+        case 'local':
+        case 'l':
+          if (!qwen.ollamaAvailable) {
+            await ctx.reply('❌ Ollama не установлена');
+            return;
+          }
+          if (!qwen.configService.ollamaRunning) {
+            await ctx.reply('⚠️ Ollama остановлена. Запустите Ollama и попробуйте снова.', parseMode: ParseMode.markdown);
+            return;
+          }
+          try {
+            final availableModels = await qwen.configService.getAvailableModels();
+            // Находим локальную модель
+            final localModel = availableModels.firstWhere(
+              (m) => m['id']!.contains('qwen2.5') || 
+                     m['id']!.contains('ollama') || 
+                     m['id']!.contains('localhost'),
+              orElse: () => throw Exception('Локальная модель не найдена'),
+            );
+            await qwen.configService.switchModel(localModel['id']!);
+            
+            // Проверяем и запускаем модель
+            final modelStarted = await qwen.configService.checkAndStartModelByName(localModel['id']!);
+            
+            if (modelStarted) {
+              await ctx.reply('✅ Переключено на 🖥 ЛОКАЛЬНУЮ модель: *${localModel['name']}*\nМодель запущена и готова', parseMode: ParseMode.markdown);
+            } else {
+              await ctx.reply('⚠️ Переключено на 🖥 ЛОКАЛЬНУЮ модель: *${localModel['name']}*\nНо модель не готова: ${qwen.configService.ollamaModelError}', parseMode: ParseMode.markdown);
+            }
+          } catch (e) {
+            await ctx.reply('❌ Error: $e');
+          }
+          break;
+
+        case 'stop':
+          // Остановить модель (выгрузить из памяти Ollama)
+          if (!qwen.configService.ollamaRunning) {
+            await ctx.reply('ℹ️ Ollama не запущена');
+            return;
+          }
+          try {
+            await ctx.reply('⏳ Остановка модели...');
+            final success = await qwen.stopModel();
+            if (success) {
+              await ctx.reply('✅ Модель остановлена. Память освобождена');
+            } else {
+              await ctx.reply('❌ Не удалось остановить модель');
+            }
+          } catch (e) {
+            await ctx.reply('❌ Error: $e');
+          }
+          break;
+
+        default:
+          // Переключить по ID модели
+          try {
+            final modelId = command;
+            final availableModels = await qwen.configService.getAvailableModels();
+            // Проверяем, существует ли такая модель
+            final model = availableModels.firstWhere(
+              (m) => m['id'] == modelId,
+              orElse: () => throw Exception('Модель "$modelId" не найдена'),
+            );
+            await qwen.configService.switchModel(modelId);
+            await ctx.reply('✅ Переключено на: *${model['name']}*', parseMode: ParseMode.markdown);
+          } catch (e) {
+            await ctx.reply('❌ Error: $e');
+          }
+      }
+    });
+
     // ─── /compact ───
     _bot!.command('compact', (ctx) async {
       if (!_isAllowed(ctx)) return;
@@ -591,6 +738,17 @@ class TelegramBotService extends ChangeNotifier {
       final buf = StringBuffer('Статус:\n\n');
       buf.writeln('Bot: ${_isRunning ? "Running" : "Stopped"}');
       buf.writeln('Qwen: ${qwen.isRunning ? "Running" : "Stopped"}');
+      buf.writeln('Model: ${qwen.isLocalModel ? "🖥 Local (config)" : "☁️ Cloud (config)"}');
+      buf.writeln('Ollama: ${qwen.ollamaAvailable ? "✅ Available" : "❌ Not available"}');
+      
+      // Получаем имя текущей модели
+      try {
+        final modelName = await qwen.getCurrentModelName();
+        if (modelName != null) {
+          buf.writeln('Current model: $modelName');
+        }
+      } catch (_) {}
+      
       buf.writeln('Messages: $_messageCount');
       final proj = projectService?.activeProject;
       if (proj != null) {
@@ -662,12 +820,19 @@ class TelegramBotService extends ChangeNotifier {
         '/newproject <имя> <путь> — Создать проект\n'
         '/switch <N> — Переключить проект\n'
         '/newsession — Новая сессия\n'
+        '/model — Управление моделью\n'
         '/compact — Сжать контекст\n'
         '/status — Статус системы\n'
         '/quota — Квота API\n'
         '/ping — Проверка связи с Qwen\n'
         '/commands — Команды Qwen Code\n'
         '/help — Эта справка\n\n'
+        'Модели:\n'
+        '/model — Текущая модель\n'
+        '/model cloud — Облачная модель\n'
+        '/model local — Локальная модель\n'
+        '/model start — Запустить Ollama\n'
+        '/model stop — Остановить Ollama\n\n'
         'Задачи (через CLI):\n'
         '/tasks [active|completed|all] — Список задач\n'
         '/starttask <номер|имя> — Запустить таймер\n'

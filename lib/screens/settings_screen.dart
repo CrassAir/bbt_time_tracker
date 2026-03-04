@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/bot_settings.dart';
+import '../services/app_directory_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   final BotSettings settings;
@@ -22,6 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _userIdsController;
   late TextEditingController _cliPathController;
   late TextEditingController _workDirController;
+  late TextEditingController _ollamaModelController;
   late bool _autoStart;
   late bool _yoloMode;
   late bool _notifyOnTimerComplete;
@@ -39,6 +41,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     _cliPathController = TextEditingController(text: widget.settings.qwenCliPath);
     _workDirController = TextEditingController(text: widget.settings.workingDirectory);
+    _ollamaModelController = TextEditingController(text: widget.settings.ollamaModel);
     _autoStart = widget.settings.autoStartBot;
     _yoloMode = widget.settings.useYoloMode;
     // Настройки уведомлений
@@ -54,6 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _userIdsController.dispose();
     _cliPathController.dispose();
     _workDirController.dispose();
+    _ollamaModelController.dispose();
     super.dispose();
   }
 
@@ -96,6 +100,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.settings.notifyOnDayEnd = _notifyOnDayEnd;
     widget.settings.notifyOnOvertime = _notifyOnOvertime;
     widget.settings.endDayReminderHour = _endDayReminderHour;
+    // Настройки нейросетей
+    widget.settings.ollamaModel = _ollamaModelController.text.trim();
+    // autoStartLocalModel сохраняется напрямую через SwitchListTile
 
     await widget.settings.save();
     widget.onSaved();
@@ -207,6 +214,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      // Директория приложения
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade900.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade700),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.info_outline, size: 16, color: Colors.blue.shade400),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Директория приложения',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue.shade400,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            FutureBuilder<String>(
+                              future: AppDirectoryService().getAppDirectory(),
+                              builder: (context, snapshot) {
+                                if (snapshot.hasData) {
+                                  return Text(
+                                    snapshot.data!,
+                                    style: const TextStyle(fontSize: 11, color: Colors.white70),
+                                  );
+                                }
+                                return const Text(
+                                  'Определение...',
+                                  style: TextStyle(fontSize: 11, color: Colors.white54),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
@@ -246,6 +298,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onChanged: (value) {
                           setState(() {
                             _yoloMode = value;
+                            _isModified = true;
+                          });
+                        },
+                        activeColor: Colors.blue.shade400,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  _SettingsSection(
+                    title: 'Нейросети',
+                    children: [
+                      const Text(
+                        'Переключение модели доступно на Dashboard',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _ollamaModelController,
+                        onChanged: (_) => setState(() => _isModified = true),
+                        decoration: InputDecoration(
+                          labelText: 'Модель Ollama',
+                          labelStyle: TextStyle(color: Colors.grey.shade400),
+                          hintText: 'qwen2.5-coder:7b-instruct-q4_K_M',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Модель для локального запуска через Ollama',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SwitchListTile(
+                        title: const Text('Автозапуск локальной модели'),
+                        subtitle: Text(
+                          'Автоматически переключать на локальную модель при старте приложения',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                        ),
+                        value: widget.settings.autoStartLocalModel,
+                        onChanged: (value) {
+                          setState(() {
+                            widget.settings.autoStartLocalModel = value;
                             _isModified = true;
                           });
                         },

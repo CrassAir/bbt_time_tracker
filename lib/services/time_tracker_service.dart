@@ -38,10 +38,10 @@ class TimeTrackerService extends ChangeNotifier {
   int get todayLeftSeconds {
     if (currentWorkDay?.startWorkDateTime == null) return 0;
     if (currentWorkDay?.endWorkDateTime != null) {
-      return currentWorkDay!.endWorkDateTime!
-          .difference(currentWorkDay!.startWorkDateTime!)
-          .inSeconds;
+      // Завершённый день — возвращаем нормативные 8 часов
+      return workDayDurationSeconds;
     }
+    // Незавершённый день — считаем от начала до текущего времени
     return DateTime.now()
         .difference(currentWorkDay!.startWorkDateTime!)
         .inSeconds;
@@ -67,6 +67,12 @@ class TimeTrackerService extends ChangeNotifier {
     if (spent <= left) return 0;
     return spent - left;
   }
+
+  /// Получить текущий долг времени (из WorkDay)
+  Duration get debtOfTime => currentWorkDay?.debtOfTime ?? Duration.zero;
+
+  /// Получить текущее свободное время (из WorkDay)
+  Duration get freeTime => currentWorkDay?.freeTime ?? Duration.zero;
 
   // Для автостарта дня
   static const int workDayDurationSeconds = 28800; // 8 часов
@@ -283,11 +289,17 @@ class TimeTrackerService extends ChangeNotifier {
       GlobalTimer().playTimeUpSound(); // исправлено
     }
 
-    // Обновляем prevWorkTime для следующего дня (как в старой версии)
+    // Рассчитываем переработку/недоработку для следующего дня
+    // prevWorkTime — это время, перенесённое с предыдущего дня
+    // Если отработали больше 8 часов — переносим разницу на следующий день (как долг)
+    // Если меньше — следующий день начинается с 0
+    final workedSeconds = day.endWorkDateTime!.difference(day.startWorkDateTime!).inSeconds;
+    final overtimeSeconds = workedSeconds - workDayDurationSeconds;
+    
     final tomorrow = DateTime.now().startOfDay!.add(const Duration(days: 1));
     final nextDay = WorkDay()
       ..createToDate = tomorrow
-      ..prevWorkTimeMilliseconds = (todaySpentSeconds - (isOffDay ? workDayDurationSeconds : todayLeftSeconds)) * 1000;
+      ..prevWorkTimeMilliseconds = (overtimeSeconds > 0 ? overtimeSeconds : 0) * 1000;
     _objectBox.putWorkDay(nextDay);
 
     notifyListeners();

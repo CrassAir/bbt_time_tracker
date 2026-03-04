@@ -7,6 +7,7 @@ import 'time_tracker_service.dart';
 import 'project_service.dart';
 import 'export_service.dart';
 import 'ipc_service.dart';
+import '../utils/duration_formatter.dart';
 import '../models/timer.dart';
 import '../models/project.dart';
 
@@ -195,7 +196,7 @@ class CliService {
     await _ipc.sendTaskAdded(timer.id);
 
     stdout.writeln('✅ Task added: #${timer.number} ${timer.name}');
-    stdout.writeln('   Estimate: ${_formatDuration(estimate)}');
+    stdout.writeln('   Estimate: ${DurationFormatter.format(estimate)}');
     if (project != null) {
       stdout.writeln('   Project: ${project.name}');
     }
@@ -353,7 +354,7 @@ class CliService {
     await _ipc.sendDayStopped();
 
     stdout.writeln('⏹ Work day stopped');
-    stdout.writeln('  Duration: ${_formatDuration(_timeTracker.todayWorkDuration)}');
+    stdout.writeln('  Duration: ${DurationFormatter.format(_timeTracker.todayWorkDuration)}');
     _log.info('CLI: Work day stopped');
   }
 
@@ -369,7 +370,26 @@ class CliService {
       if (workDay.endWorkDateTime != null) {
         stdout.writeln('   Ended: ${workDay.endWorkDateTime}');
       }
-      stdout.writeln('   Duration: ${_formatDuration(_timeTracker.todayWorkDuration)}');
+      
+      // Рассчитываем длительность правильно
+      Duration workDuration;
+      if (workDay.endWorkDateTime != null) {
+        workDuration = workDay.endWorkDateTime!.difference(workDay.startWorkDateTime!);
+      } else {
+        workDuration = DateTime.now().difference(workDay.startWorkDateTime!);
+      }
+      
+      stdout.writeln('   Worked: ${DurationFormatter.format(workDuration)}');
+      stdout.writeln('   Standard: ${DurationFormatter.format(const Duration(hours: 8))}');
+      
+      // Debt / Free time
+      final debt = _timeTracker.debtSeconds;
+      final free = _timeTracker.freeSeconds;
+      if (debt > 0) {
+        stdout.writeln('   ⚠️ Debt: ${DurationFormatter.format(Duration(seconds: debt))}');
+      } else if (free > 0) {
+        stdout.writeln('   ✅ Free: ${DurationFormatter.format(Duration(seconds: free))}');
+      }
     } else {
       stdout.writeln('📅 Work Day: Not started');
     }
@@ -387,7 +407,7 @@ class CliService {
     if (runningTimers.isNotEmpty) {
       stdout.writeln('\n▶ Running:');
       for (final timer in runningTimers) {
-        stdout.writeln('   #${timer.number} ${timer.name} (${_formatDuration(timer.durationLeft ?? Duration.zero)} / ${_formatDuration(timer.estimate)})');
+        stdout.writeln('   #${timer.number} ${timer.name} (${DurationFormatter.format(timer.durationLeft ?? Duration.zero)} / ${DurationFormatter.format(timer.estimate)})');
       }
     }
 
@@ -453,7 +473,7 @@ class CliService {
     await _ipc.sendTaskStarted(timer.id);
 
     stdout.writeln('▶ Timer started: #${timer.number} ${timer.name}');
-    stdout.writeln('  Estimate: ${_formatDuration(timer.estimate)}');
+    stdout.writeln('  Estimate: ${DurationFormatter.format(timer.estimate)}');
     _log.info('CLI: Timer started - #${timer.number} ${timer.name}');
   }
 
@@ -507,8 +527,8 @@ class CliService {
     await _ipc.sendTaskStopped(timer.id);
 
     stdout.writeln('⏹ Timer stopped: #${timer.number} ${timer.name}');
-    stdout.writeln('  Spent: ${_formatDuration(timer.durationLeft ?? Duration.zero)}');
-    stdout.writeln('  Left: ${_formatDuration(timer.timeLeft)}');
+    stdout.writeln('  Spent: ${DurationFormatter.format(timer.durationLeft ?? Duration.zero)}');
+    stdout.writeln('  Left: ${DurationFormatter.format(timer.timeLeft)}');
     _log.info('CLI: Timer stopped - #${timer.number} ${timer.name}');
   }
 
@@ -553,7 +573,7 @@ class CliService {
     for (final timer in filtered) {
       final statusIcon = timer.isComplete ? '✅' : (timer.isRunning ? '▶' : '⏸');
       stdout.writeln('$statusIcon #${timer.number} ${timer.name}');
-      stdout.writeln('   Estimate: ${_formatDuration(timer.estimate)}');
+      stdout.writeln('   Estimate: ${DurationFormatter.format(timer.estimate)}');
       if (timer.project != null && timer.project!.isNotEmpty) {
         stdout.writeln('   Project: ${timer.project}');
       }
@@ -561,9 +581,9 @@ class CliService {
         stdout.writeln('   Description: ${timer.description}');
       }
       if (timer.isRunning) {
-        stdout.writeln('   Running: ${_formatDuration(timer.durationLeft ?? Duration.zero)}');
+        stdout.writeln('   Running: ${DurationFormatter.format(timer.durationLeft ?? Duration.zero)}');
       } else if (timer.isComplete) {
-        stdout.writeln('   Completed: ${_formatDuration(timer.durationLeft ?? Duration.zero)}');
+        stdout.writeln('   Completed: ${DurationFormatter.format(timer.durationLeft ?? Duration.zero)}');
       }
       stdout.writeln('');
     }
@@ -690,15 +710,6 @@ Examples:
   qwen_time_tracker.exe status
   qwen_time_tracker.exe export-excel --from 2026-03-01 --to 2026-03-03
 ''');
-  }
-
-  String _formatDuration(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    final s = d.inSeconds % 60;
-    if (h > 0) return '${h}h ${m}m';
-    if (m > 0) return '${m}m ${s}s';
-    return '${s}s';
   }
 
   void dispose() {

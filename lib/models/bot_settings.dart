@@ -9,12 +9,17 @@ class BotSettings {
   bool autoStartBot;
   bool launchAtLogin;
   bool useYoloMode;
-  
+
   // Настройки уведомлений
   bool notifyOnTimerComplete;
   bool notifyOnDayEnd;
   bool notifyOnOvertime;
   int endDayReminderHour;
+
+  // Настройки нейросетей
+  String ollamaModel;  // Название модели Ollama
+  bool autoStartLocalModel;  // Автозапуск локальной модели при старте
+  bool autoStartOllama;  // Автозапуск Ollama сервера при старте
 
   BotSettings({
     this.telegramBotToken = '',
@@ -28,6 +33,9 @@ class BotSettings {
     this.notifyOnDayEnd = true,
     this.notifyOnOvertime = true,
     this.endDayReminderHour = 19,
+    this.ollamaModel = 'qwen2.5-coder:7b-instruct-q4_K_M',
+    this.autoStartLocalModel = false,
+    this.autoStartOllama = false,
   })  : allowedUserIds = allowedUserIds ?? [],
         workingDirectory = workingDirectory ?? _defaultWorkingDir;
 
@@ -55,6 +63,9 @@ class BotSettings {
     await prefs.setBool('notify_on_day_end', notifyOnDayEnd);
     await prefs.setBool('notify_on_overtime', notifyOnOvertime);
     await prefs.setInt('end_day_reminder_hour', endDayReminderHour);
+    // Настройки нейросетей
+    await prefs.setString('ollama_model', ollamaModel);
+    await prefs.setBool('auto_start_local_model', autoStartLocalModel);
   }
 
   static Future<BotSettings> load() async {
@@ -76,6 +87,9 @@ class BotSettings {
       notifyOnDayEnd: prefs.getBool('notify_on_day_end') ?? true,
       notifyOnOvertime: prefs.getBool('notify_on_overtime') ?? true,
       endDayReminderHour: prefs.getInt('end_day_reminder_hour') ?? 19,
+      // Настройки нейросетей
+      ollamaModel: prefs.getString('ollama_model') ?? 'qwen2.5-coder:7b-instruct-q4_K_M',
+      autoStartLocalModel: prefs.getBool('auto_start_local_model') ?? false,
     );
   }
 }

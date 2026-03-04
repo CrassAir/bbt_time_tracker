@@ -5,6 +5,8 @@ import 'package:form_builder_validators/form_builder_validators.dart';
 import '../services/time_tracker_service.dart';
 import '../services/project_service.dart';
 import '../services/objectbox_service.dart';
+import '../services/qwen_code_service.dart';
+import '../utils/duration_formatter.dart';
 import '../widgets/day_progress.dart';
 import '../widgets/timer_item.dart';
 import '../widgets/blinking_card.dart';
@@ -16,6 +18,7 @@ enum DashboardQuickAction { history, projects }
 class DashboardScreen extends StatefulWidget {
   final TimeTrackerService timeTrackerService;
   final ProjectService? projectService;
+  final QwenCodeService? qwenService;
   final VoidCallback? onStartBot;
   final VoidCallback? onStopBot;
   final bool botRunning;
@@ -25,6 +28,7 @@ class DashboardScreen extends StatefulWidget {
     super.key,
     required this.timeTrackerService,
     this.projectService,
+    this.qwenService,
     this.onStartBot,
     this.onStopBot,
     this.botRunning = false,
@@ -113,11 +117,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Text(
                       '#${timer.number}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade300,
-                      ),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue.shade300),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -235,15 +235,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  String _formatDuration(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    final s = d.inSeconds % 60;
-    if (h > 0) return '${h}h ${m}m';
-    if (m > 0) return '${m}m ${s}s';
-    return '${s}s';
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -264,64 +255,258 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white),
                 ),
                 const SizedBox(height: 24),
+                // Model switcher - с кнопками управления Ollama и моделью
+                if (widget.qwenService != null)
+                  ListenableBuilder(
+                    listenable: widget.qwenService!.configService,
+                    builder: (context, _) {
+                      final configService = widget.qwenService!.configService;
+                      final isLocal = configService.isLocalModel;
+                      final ollamaAvailable = configService.ollamaAvailable;
+                      final ollamaRunning = configService.ollamaRunning;
+                      final ollamaModelReady = configService.ollamaModelReady;
+                      final isSwitching = configService.isSwitching;
 
-                // Day Progress Circle
-                SizedBox(height: 320, child: MultiLevelCircularProgress(service: widget.timeTrackerService)),
-
-                const SizedBox(height: 24),
-
-                // Stats cards
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatusCard(
-                        title: 'Сегодня',
-                        child: Text(
-                          _formatDuration(todayDuration),
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.blue.shade300),
+                      return Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isLocal ? Colors.orange.shade900.withValues(alpha: 0.2) : Colors.blue.shade900.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: isLocal ? Colors.orange.shade700 : Colors.blue.shade700, width: 1.5),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatusCard(
-                        title: 'Таймеры',
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              '${widget.timeTrackerService.timers.length}',
-                              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.blue.shade300),
+                            // Заголовок и статус
+                            Row(
+                              children: [
+                                // Индикатор статуса
+                                Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: ollamaAvailable
+                                        ? (ollamaRunning ? (ollamaModelReady ? Colors.green : Colors.orange) : Colors.red.shade400)
+                                        : Colors.grey.shade600,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color:
+                                            (ollamaAvailable
+                                                    ? (ollamaRunning ? (ollamaModelReady ? Colors.green : Colors.orange) : Colors.red)
+                                                    : Colors.grey)
+                                                .withValues(alpha: 0.5),
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        isLocal ? '🖥 Локальная модель' : '☁️ Облачная модель',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: isLocal ? Colors.orange : Colors.blue.shade300,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        !ollamaAvailable
+                                            ? '⚠️ Ollama не найдена'
+                                            : !ollamaRunning
+                                            ? 'Ollama: остановлена'
+                                            : !ollamaModelReady
+                                            ? '🔄 Проверка модели...'
+                                            : isLocal
+                                            ? '✅ Активна'
+                                            : 'Готова к работе',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: !ollamaAvailable
+                                              ? Colors.grey.shade500
+                                              : !ollamaRunning
+                                              ? Colors.orange
+                                              : !ollamaModelReady
+                                              ? Colors.orange
+                                              : Colors.grey.shade500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Кнопка проверки Ollama
+                                IconButton(
+                                  icon: const Icon(Icons.refresh, size: 18),
+                                  tooltip: 'Проверить Ollama',
+                                  onPressed: () async {
+                                    await widget.qwenService!.configService.checkOllamaStatus();
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            widget.qwenService!.configService.ollamaAvailable ? '✅ Ollama найдена' : '❌ Ollama не найдена',
+                                          ),
+                                          backgroundColor: widget.qwenService!.configService.ollamaAvailable ? Colors.green : Colors.red,
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  padding: const EdgeInsets.all(4),
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
                             ),
-                            if (activeTimers > 0) ...[
-                              const SizedBox(width: 4),
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.green),
+                            const SizedBox(height: 12),
+                            // Кнопки управления Ollama (если установлена)
+                            if (ollamaAvailable) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: ollamaRunning && !isSwitching ? () => widget.qwenService?.stopOllama() : null,
+                                      icon: const Icon(Icons.stop, size: 16),
+                                      label: const Text('Остановить Ollama', style: TextStyle(fontSize: 11)),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.red.shade400,
+                                        side: BorderSide(color: Colors.red.shade700),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              // Кнопка остановки модели (если модель запущена)
+                              if (ollamaRunning && ollamaModelReady) ...[
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: !isSwitching ? () => widget.qwenService?.stopModel() : null,
+                                        icon: const Icon(Icons.memory, size: 16),
+                                        label: const Text('Остановить модель', style: TextStyle(fontSize: 11)),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.orange.shade400,
+                                          side: BorderSide(color: Colors.orange.shade700),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                            ],
+                            // Переключатель моделей
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _ModelSwitchButton(
+                                    label: '☁️ Облачная',
+                                    isActive: !isLocal,
+                                    isEnabled: !isSwitching,
+                                    onTap: isSwitching ? null : () async {
+                                      final models = await widget.qwenService!.getAvailableModels();
+                                      final cloudModel = models.firstWhere(
+                                        (m) => !m['id']!.contains('qwen2.5') && 
+                                               !m['id']!.contains('ollama') && 
+                                               !m['id']!.contains('localhost'),
+                                        orElse: () => models.first,
+                                      );
+                                      await widget.qwenService!.switchModel(cloudModel['id']!);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _ModelSwitchButton(
+                                    label: '🖥 Локальная',
+                                    isActive: isLocal,
+                                    isEnabled: ollamaRunning && !isSwitching,
+                                    onTap: isSwitching || !ollamaRunning
+                                        ? null
+                                        : () async {
+                                            try {
+                                              // Пытаемся переключиться
+                                              final models = await widget.qwenService!.getAvailableModels();
+                                              final localModel = models.firstWhere(
+                                                (m) => m['id']!.contains('qwen2.5') ||
+                                                       m['id']!.contains('ollama') ||
+                                                       m['id']!.contains('localhost'),
+                                                orElse: () => models.first,
+                                              );
+                                              await widget.qwenService!.switchModel(localModel['id']!);
+                                              // Проверяем и запускаем модель по имени
+                                              final checkResult = await widget.qwenService!.configService.checkAndStartModelByName(localModel['id']!);
+                                              if (!checkResult && mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      '⚠️ Модель не готова: ${widget.qwenService!.configService.ollamaModelError}',
+                                                    ),
+                                                    backgroundColor: Colors.orange,
+                                                  ),
+                                                );
+                                              } else if (mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('✅ Локальная модель запущена и готова'),
+                                                    backgroundColor: Colors.green,
+                                                  ),
+                                                );
+                                              }
+                                            } catch (e) {
+                                              if (mounted) {
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(SnackBar(content: Text('❌ Ошибка: $e'), backgroundColor: Colors.red));
+                                              }
+                                            }
+                                          },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            // Индикатор переключения
+                            if (isSwitching) ...[
+                              const SizedBox(height: 8),
+                              LinearProgressIndicator(
+                                backgroundColor: Colors.grey.shade800,
+                                valueColor: AlwaysStoppedAnimation<Color>(isLocal ? Colors.orange : Colors.blue),
+                              ),
+                            ],
+                            // Подсказка
+                            if (!ollamaAvailable) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Установите Ollama: https://ollama.ai',
+                                style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                              ),
+                            ] else if (!ollamaRunning) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Запустите Ollama для использования локальной модели',
+                                style: TextStyle(fontSize: 10, color: Colors.orange, fontStyle: FontStyle.italic),
+                              ),
+                            ] else if (!ollamaModelReady) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Проверка модели через ollama run...',
+                                style: TextStyle(fontSize: 10, color: Colors.orange, fontStyle: FontStyle.italic),
                               ),
                             ],
                           ],
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatusCard(
-                        title: 'Проект',
-                        child: Text(
-                          activeProject?.name ?? 'Нет',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade400),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
+                      );
+                    },
+                  ),
+                const SizedBox(height: 12),
                 // Bot control buttons
                 Row(
                   children: [
@@ -369,6 +554,93 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 const SizedBox(height: 24),
 
+                // Day Progress Circle
+                SizedBox(height: 320, child: MultiLevelCircularProgress(service: widget.timeTrackerService)),
+
+                const SizedBox(height: 24),
+
+                // Stats cards
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StatusCard(
+                        title: 'Сегодня',
+                        child: Text(
+                          DurationFormatter.format(todayDuration),
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.blue.shade300),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _StatusCard(
+                        title: 'Таймеры',
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${widget.timeTrackerService.timers.length}',
+                              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.blue.shade300),
+                            ),
+                            if (activeTimers > 0) ...[
+                              const SizedBox(width: 4),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.green),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _StatusCard(
+                        title: 'Проект',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              activeProject?.name ?? 'Нет',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade400),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: widget.qwenService?.isLocalModel == true ? Colors.orange : Colors.blue,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    widget.qwenService?.isLocalModel == true ? '🖥 Local' : '☁️ Cloud',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                      color: widget.qwenService?.isLocalModel == true ? Colors.orange : Colors.blue.shade300,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
                 // Add timer form
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -393,11 +665,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               child: Text(
                                 '#${widget.timeTrackerService.timers.fold<int>(0, (max, t) => t.number > max ? t.number : max) + 1}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue.shade300,
-                                ),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue.shade300),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -689,6 +957,81 @@ class _StatusCard extends StatelessWidget {
           const SizedBox(height: 8),
           child,
         ],
+      ),
+    );
+  }
+}
+
+/// Кнопка переключателя моделей
+class _ModelSwitchButton extends StatefulWidget {
+  final String label;
+  final bool isActive;
+  final bool isEnabled;
+  final VoidCallback? onTap;
+
+  const _ModelSwitchButton({required this.label, required this.isActive, required this.isEnabled, this.onTap});
+
+  @override
+  State<_ModelSwitchButton> createState() => _ModelSwitchButtonState();
+}
+
+class _ModelSwitchButtonState extends State<_ModelSwitchButton> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseColor = widget.isActive ? (widget.label.contains('Локальная') ? Colors.orange : Colors.blue) : Colors.grey.shade700;
+
+    return GestureDetector(
+      onTap: widget.isEnabled ? widget.onTap : null,
+      child: MouseRegion(
+        onEnter: (_) {
+          if (widget.isEnabled) setState(() => _hovering = true);
+        },
+        onExit: (_) {
+          if (widget.isEnabled) setState(() => _hovering = false);
+        },
+        cursor: widget.isEnabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            color: widget.isActive
+                ? baseColor
+                : _hovering && widget.isEnabled
+                ? baseColor.withValues(alpha: 0.7)
+                : Colors.grey.shade800,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: widget.isActive
+                  ? baseColor
+                  : _hovering && widget.isEnabled
+                  ? Colors.grey.shade600
+                  : Colors.grey.shade700,
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (widget.isActive)
+                Container(
+                  width: 6,
+                  height: 6,
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                ),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.w500,
+                  color: widget.isEnabled ? (widget.isActive ? Colors.white : Colors.grey.shade300) : Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
