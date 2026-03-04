@@ -30,6 +30,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _notifyOnDayEnd;
   late bool _notifyOnOvertime;
   late int _endDayReminderHour;
+  
+  // Настройки рабочего дня
+  late int _workDayStartHour;
+  late int _workDayDurationHours;
+  late bool _autoStartDay;
+  late bool _autoStopDay;
+  
+  // Звуковые уведомления
+  String? _dayStartSoundPath;
+  String? _dayEndSoundPath;
+  String? _taskEndingSoonSoundPath;
+  late int _taskEndingSoonSeconds;
+  
   bool _isModified = false;
 
   @override
@@ -49,6 +62,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _notifyOnDayEnd = widget.settings.notifyOnDayEnd;
     _notifyOnOvertime = widget.settings.notifyOnOvertime;
     _endDayReminderHour = widget.settings.endDayReminderHour;
+    // Настройки рабочего дня
+    _workDayStartHour = widget.settings.workDayStartHour;
+    _workDayDurationHours = widget.settings.workDayDurationHours;
+    _autoStartDay = widget.settings.autoStartDay;
+    _autoStopDay = widget.settings.autoStopDay;
+    // Звуковые уведомления
+    _dayStartSoundPath = widget.settings.dayStartSoundPath;
+    _dayEndSoundPath = widget.settings.dayEndSoundPath;
+    _taskEndingSoonSoundPath = widget.settings.taskEndingSoonSoundPath;
+    _taskEndingSoonSeconds = widget.settings.taskEndingSoonSeconds;
   }
 
   @override
@@ -102,6 +125,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.settings.endDayReminderHour = _endDayReminderHour;
     // Настройки нейросетей
     widget.settings.ollamaModel = _ollamaModelController.text.trim();
+    // Настройки рабочего дня
+    widget.settings.workDayStartHour = _workDayStartHour;
+    widget.settings.workDayDurationHours = _workDayDurationHours;
+    widget.settings.autoStartDay = _autoStartDay;
+    widget.settings.autoStopDay = _autoStopDay;
+    // Звуковые уведомления
+    widget.settings.dayStartSoundPath = _dayStartSoundPath;
+    widget.settings.dayEndSoundPath = _dayEndSoundPath;
+    widget.settings.taskEndingSoonSoundPath = _taskEndingSoonSoundPath;
+    widget.settings.taskEndingSoonSeconds = _taskEndingSoonSeconds;
     // autoStartLocalModel сохраняется напрямую через SwitchListTile
 
     await widget.settings.save();
@@ -302,6 +335,157 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           });
                         },
                         activeColor: Colors.blue.shade400,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  _SettingsSection(
+                    title: 'Рабочий день',
+                    children: [
+                      SwitchListTile(
+                        title: const Text('Авто-старт дня'),
+                        subtitle: Text(
+                          'Начинать день автоматически в указанное время',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                        ),
+                        value: _autoStartDay,
+                        onChanged: (value) {
+                          setState(() {
+                            _autoStartDay = value;
+                            _isModified = true;
+                          });
+                        },
+                        activeColor: Colors.blue.shade400,
+                      ),
+                      SwitchListTile(
+                        title: const Text('Авто-стоп дня'),
+                        subtitle: Text(
+                          'Завершать день автоматически через указанное время',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                        ),
+                        value: _autoStopDay,
+                        onChanged: (value) {
+                          setState(() {
+                            _autoStopDay = value;
+                            _isModified = true;
+                          });
+                        },
+                        activeColor: Colors.blue.shade400,
+                      ),
+                      ListTile(
+                        title: const Text('Время старта'),
+                        subtitle: Text('${_workDayStartHour}:00'),
+                        trailing: DropdownButton<int>(
+                          value: _workDayStartHour,
+                          items: List.generate(12, (i) => i + 8)
+                              .map((h) => DropdownMenuItem(value: h, child: Text('$h:00')))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _workDayStartHour = value!;
+                              _isModified = true;
+                            });
+                          },
+                        ),
+                      ),
+                      ListTile(
+                        title: const Text('Продолжительность'),
+                        subtitle: Text('${_workDayDurationHours} часов'),
+                        trailing: DropdownButton<int>(
+                          value: _workDayDurationHours,
+                          items: [4, 6, 8, 10, 12]
+                              .map((h) => DropdownMenuItem(value: h, child: Text('$h ч')))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _workDayDurationHours = value!;
+                              _isModified = true;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  _SettingsSection(
+                    title: 'Звуковые уведомления',
+                    children: [
+                      ListTile(
+                        title: const Text('Старт дня'),
+                        subtitle: Text(_dayStartSoundPath ?? 'Звук по умолчанию'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.folder_open),
+                          onPressed: () async {
+                            final result = await FilePicker.platform.pickFiles(
+                              type: FileType.audio,
+                              allowMultiple: false,
+                            );
+                            if (result != null) {
+                              setState(() {
+                                _dayStartSoundPath = result.files.single.path;
+                                _isModified = true;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      ListTile(
+                        title: const Text('Завершение дня'),
+                        subtitle: Text(_dayEndSoundPath ?? 'Звук по умолчанию'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.folder_open),
+                          onPressed: () async {
+                            final result = await FilePicker.platform.pickFiles(
+                              type: FileType.audio,
+                              allowMultiple: false,
+                            );
+                            if (result != null) {
+                              setState(() {
+                                _dayEndSoundPath = result.files.single.path;
+                                _isModified = true;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      ListTile(
+                        title: const Text('Окончание задачи'),
+                        subtitle: Text(_taskEndingSoonSoundPath ?? 'Звук по умолчанию'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.folder_open),
+                          onPressed: () async {
+                            final result = await FilePicker.platform.pickFiles(
+                              type: FileType.audio,
+                              allowMultiple: false,
+                            );
+                            if (result != null) {
+                              setState(() {
+                                _taskEndingSoonSoundPath = result.files.single.path;
+                                _isModified = true;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      ListTile(
+                        title: const Text('Предупреждать за'),
+                        subtitle: Text('${_taskEndingSoonSeconds} сек'),
+                        trailing: DropdownButton<int>(
+                          value: _taskEndingSoonSeconds,
+                          items: [30, 60, 120, 300]
+                              .map((s) => DropdownMenuItem(value: s, child: Text('$s сек')))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _taskEndingSoonSeconds = value!;
+                              _isModified = true;
+                            });
+                          },
+                        ),
                       ),
                     ],
                   ),
