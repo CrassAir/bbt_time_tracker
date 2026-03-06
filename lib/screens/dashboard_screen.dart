@@ -241,7 +241,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       listenable: Listenable.merge([widget.timeTrackerService, widget.projectService]),
       builder: (context, _) {
         final activeProject = widget.projectService?.activeProject;
-        final todayDuration = Duration(seconds: widget.timeTrackerService.todayLeftSeconds);
+        final todayDuration = Duration(seconds: widget.timeTrackerService.todayWorkSeconds);
         final activeTimers = widget.timeTrackerService.timers.where((t) => t.isRunning).length;
 
         return SingleChildScrollView(

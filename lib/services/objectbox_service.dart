@@ -40,12 +40,17 @@ class ObjectBoxService {
 
   WorkDay? getCurrentWorkDay() {
     final today = DateTime.now();
-    final startOfDay = DateTime(today.year, today.month, today.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final todayYear = today.year;
+    final todayMonth = today.month;
+    final todayDay = today.day;
 
     final allWorkDays = workDayBox.getAll();
     for (final wd in allWorkDays) {
-      if (wd.createToDate.isAfter(startOfDay) && wd.createToDate.isBefore(endOfDay)) {
+      final createToDate = wd.createToDate;
+      // Сравниваем по году, месяцу и дню
+      if (createToDate.year == todayYear &&
+          createToDate.month == todayMonth &&
+          createToDate.day == todayDay) {
         return wd;
       }
     }
@@ -55,23 +60,28 @@ class ObjectBoxService {
   /// Получить предыдущий рабочий день
   WorkDay? getPreviousWorkDay(DateTime date) {
     final allWorkDays = workDayBox.getAll();
-    final dateStartOfDay = date.startOfDay ?? date;
+    final dateStartOfDay = DateTime(date.year, date.month, date.day, 0, 0, 0);
     final result = allWorkDays
-      .where((d) => d.createToDate.isBefore(dateStartOfDay))
+      .where((d) {
+        final dStartOfDay = DateTime(d.createToDate.year, d.createToDate.month, d.createToDate.day, 0, 0, 0);
+        return dStartOfDay.isBefore(dateStartOfDay);
+      })
       .toList()
       ..sort((a, b) => b.createToDate.compareTo(a.createToDate));
-    
+
     return result.firstOrNull;
   }
 
   /// Получить рабочий день по дате
   WorkDay? getWorkDayByDate(DateTime date) {
-    final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final dateStartOfDay = DateTime(date.year, date.month, date.day, 0, 0, 0);
+    final dateEndOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
 
     final allWorkDays = workDayBox.getAll();
     for (final wd in allWorkDays) {
-      if (wd.createToDate.isAfter(startOfDay) && wd.createToDate.isBefore(endOfDay)) {
+      final createToDate = wd.createToDate;
+      if (createToDate.isAtSameMomentAs(dateStartOfDay) ||
+          (createToDate.isAfter(dateStartOfDay) && createToDate.isBefore(dateEndOfDay))) {
         return wd;
       }
     }

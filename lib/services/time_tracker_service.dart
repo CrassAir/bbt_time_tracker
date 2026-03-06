@@ -54,38 +54,70 @@ class TimeTrackerService extends ChangeNotifier {
 
   // === ВЫЧИСЛЯЕМЫЕ ПОЛЯ — БЕРЁМ ИЗ WORKDAY ===
 
-  int get todaySpentSeconds {
-    return (currentWorkDay?.totalSpentMilliseconds ?? 0) ~/ 1000;
+  /// Время работы дня (от нажатия Start day)
+  int get todayWorkSeconds => todayWorkDuration.inSeconds;
+
+  /// Оставшееся время рабочего дня (8 часов - время работы)
+  int get todayRemainingSeconds {
+    final maxSeconds = _settings.workDayDurationHours * 3600;
+    final remaining = maxSeconds - todayWorkSeconds;
+    return remaining > 0 ? remaining : 0;
   }
 
-  int get todayEstimateSeconds {
+  /// Сумма estimate всех задач дня
+  int get todayTasksEstimateSeconds {
     final day = currentWorkDay;
     if (day == null) return 0;
     return (day.totalEstimateMilliseconds + day.prevWorkTimeMilliseconds) ~/ 1000;
   }
 
-  int get todayLeftSeconds {
-    return todayEstimateSeconds;
+  /// Сумма фактически затраченного времени на задачи
+  int get todayTasksSpentSeconds {
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day, 0, 0, 0);
+    final todayEnd = DateTime(today.year, today.month, today.day, 23, 59, 59);
+    
+    final todayTasks = _timers.where((t) =>
+      t.startDateTime != null &&
+      t.startDateTime!.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
+      t.startDateTime!.isBefore(todayEnd.add(const Duration(seconds: 1)))
+    );
+    
+    return todayTasks.fold<int>(0, (sum, t) => sum + (t.durationLeftMilliseconds ~/ 1000));
   }
 
-  // === БАЛАНС ===
-
+  /// Свободное время = сэкономленное на задачах + перенос с прошлого дня
   int get freeSeconds {
-    final spent = todaySpentSeconds;
-    final estimate = todayEstimateSeconds;
-    if (spent < estimate) {
-      return estimate - spent;
+    // Если задачи еще не начаты или нет estimate
+    if (todayTasksEstimateSeconds <= 0) return 0;
+    
+    // Экономия = estimate - spent (только если положительная)
+    final savedOnTasks = todayTasksEstimateSeconds - todayTasksSpentSeconds;
+    if (savedOnTasks > 0) {
+      return savedOnTasks;
     }
     return 0;
   }
 
+  /// Задолженность времени = время работы дня - (estimate задач + free time)
   int get debtSeconds {
-    final spent = todaySpentSeconds;
-    final estimate = todayEstimateSeconds;
-    if (spent > estimate) {
-      return spent - estimate;
+    // Если есть свободное время от задач, используем его
+    final savedOnTasks = todayTasksEstimateSeconds - todayTasksSpentSeconds;
+    
+    if (savedOnTasks > 0) {
+      // Есть экономия на задачах - сначала уменьшаем её временем работы
+      final remainingFree = savedOnTasks - todayWorkSeconds;
+      if (remainingFree > 0) {
+        return 0; // Еще есть свободное время
+      }
+      // Свободное время закончилось, начинается задолженность
+      return -remainingFree;
+    } else {
+      // Задачи превысили estimate - сразу считаем задолженность
+      final overTime = -savedOnTasks; // Превышение estimate
+      final workOverEstimate = todayWorkSeconds - (todayTasksEstimateSeconds + overTime);
+      return workOverEstimate > 0 ? workOverEstimate : 0;
     }
-    return 0;
   }
 
   Duration get debtOfTime => currentWorkDay?.debtOfTime ?? Duration.zero;
@@ -93,9 +125,10 @@ class TimeTrackerService extends ChangeNotifier {
   Duration get todayBalance => currentWorkDay?.balance ?? Duration.zero;
   
   Duration get todayWorkDuration {
-    if (currentWorkDay?.startWorkDateTime == null) return Duration.zero;
+    final day = currentWorkDay;
+    if (day?.startWorkDateTime == null) return Duration.zero;
     final now = DateTime.now();
-    return now.difference(currentWorkDay!.startWorkDateTime!);
+    return now.difference(day!.startWorkDateTime!);
   }
   
   bool get isOffDay {
@@ -106,6 +139,8 @@ class TimeTrackerService extends ChangeNotifier {
   }
 
   int _tickCounter = 0;
+  bool _dayStartSoundPlayed = false;
+  bool _dayEndSoundPlayed = false;
 
   void _onTimerTick() {
     // Увеличиваем durationLeft у всех запущенных таймеров
@@ -116,18 +151,23 @@ class TimeTrackerService extends ChangeNotifier {
         changed = true;
       }
     }
-    if (changed) {
-      _tickCounter++;
-      // Сохраняем в БД каждые 10 секунд
-      if (_tickCounter % 10 == 0) {
-        for (final t in timers.where((t) => t.isRunning)) {
-          _objectBox.putTimer(t);
-        }
+    
+    // Всегда уведомляем слушателей для обновления UI (таймер дня, прогресс)
+    _tickCounter++;
+    
+    // Сохраняем в БД каждые 10 секунд
+    if (changed && _tickCounter % 10 == 0) {
+      for (final t in timers.where((t) => t.isRunning)) {
+        _objectBox.putTimer(t);
       }
-      // Проверяем окончание задачи (<60 сек)
-      _checkTaskEndingSoon();
-      notifyListeners();
     }
+    
+    // Проверяем окончание задачи (<60 сек)
+    if (changed) {
+      _checkTaskEndingSoon();
+    }
+    
+    notifyListeners();
   }
 
   void _onDayTick() {
@@ -138,29 +178,33 @@ class TimeTrackerService extends ChangeNotifier {
 
   void _checkAutoStartStop() {
     if (!_settings.autoStartDay || !_settings.autoStopDay) return;
-    
+
     final now = DateTime.now();
     final startHour = _settings.workDayStartHour;
     final durationHours = _settings.workDayDurationHours;
-    
+
     final todayStart = now.startOfDay!.add(Duration(hours: startHour));
     final todayEnd = todayStart.add(Duration(hours: durationHours));
 
     // Автостарт в указанное время, если день не начат
     if (now.isAfter(todayStart) &&
         now.isBefore(todayEnd) &&
-        currentWorkDay?.startWorkDateTime == null) {
+        currentWorkDay?.startWorkDateTime == null &&
+        !_dayStartSoundPlayed) {
       _startWorkDay(startDateTime: todayStart);
       _playDayStartSound();
+      _dayStartSoundPlayed = true;
     }
 
     // Автостоп через указанное количество часов после старта
     if (currentWorkDay?.startWorkDateTime != null &&
         currentWorkDay?.endWorkDateTime == null &&
         now.isAfter(currentWorkDay!.startWorkDateTime!
-            .add(Duration(hours: durationHours)))) {
+            .add(Duration(hours: durationHours))) &&
+        !_dayEndSoundPlayed) {
       _endWorkDay(isSoft: true);
       _playDayEndSound();
+      _dayEndSoundPlayed = true;
     }
   }
 
@@ -208,12 +252,17 @@ class TimeTrackerService extends ChangeNotifier {
 
   void _checkDayRollover() {
     final now = DateTime.now();
-    final today = now.startOfDay ?? DateTime.now();
+    final today = DateTime(now.year, now.month, now.day, 0, 0, 0);
 
     // Проверяем, перешли ли на новый день
-    if (currentWorkDay?.createToDate.startOfDay != today) {
+    final currentDay = currentWorkDay;
+    final currentDayDate = currentDay?.createToDate != null 
+        ? DateTime(currentDay!.createToDate.year, currentDay.createToDate.month, currentDay.createToDate.day, 0, 0, 0)
+        : null;
+    
+    if (currentDayDate != today) {
       // === 1. ЗАВЕРШАЕМ ПРЕДЫДУЩИЙ ДЕНЬ ===
-      if (currentWorkDay?.endWorkDateTime == null) {
+      if (currentDay?.endWorkDateTime == null) {
         _endWorkDay(isSoft: true); // Мягкое завершение (без звука)
       }
 
@@ -226,6 +275,11 @@ class TimeTrackerService extends ChangeNotifier {
         ..prevWorkTimeMilliseconds = previousDay?.carriedOverMilliseconds ?? 0;
 
       _objectBox.putWorkDay(newWorkDay);
+
+      // === 4. СБРАСЫВАЕМ ФЛАГИ ЗВУКОВ ===
+      _dayStartSoundPlayed = false;
+      _dayEndSoundPlayed = false;
+
       notifyListeners();
     }
   }
@@ -318,11 +372,21 @@ class TimeTrackerService extends ChangeNotifier {
   }
 
   void _startWorkDay({DateTime? startDateTime}) {
-    final day = currentWorkDay ?? WorkDay();
-    day.startWorkDateTime ??= startDateTime ?? DateTime.now();
-    day.endWorkDateTime = null;
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day, 0, 0, 0);
+    
+    var day = currentWorkDay;
+    if (day == null) {
+      day = WorkDay()
+        ..createToDate = todayStart
+        ..startWorkDateTime = startDateTime ?? DateTime.now()
+        ..endWorkDateTime = null;
+    } else {
+      day.startWorkDateTime = startDateTime ?? DateTime.now();
+      day.endWorkDateTime = null;
+    }
+    
     _objectBox.putWorkDay(day);
-    // Подписка уже есть
     notifyListeners();
   }
 
@@ -334,18 +398,22 @@ class TimeTrackerService extends ChangeNotifier {
     day.endWorkDateTime = DateTime.now();
 
     // === 1. СОБИРАЕМ ВСЕ ЗАДАЧИ ДНЯ ===
-    final today = DateTime.now().startOfDay;
-    final todayTasks = timers.where((t) =>
-      t.startDateTime != null && 
-      t.startDateTime!.startOfDay == today
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day, 0, 0, 0);
+    final todayEnd = DateTime(today.year, today.month, today.day, 23, 59, 59);
+    
+    final todayTasks = _timers.where((t) =>
+      t.startDateTime != null &&
+      t.startDateTime!.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
+      t.startDateTime!.isBefore(todayEnd.add(const Duration(seconds: 1)))
     );
 
     // === 2. СУММИРУЕМ ESTIMATE И SPENT ===
     day.totalEstimateMilliseconds = todayTasks
-      .fold(0, (sum, t) => sum + t.estimate.inMilliseconds);
-    
+      .fold(0, (sum, t) => sum + t.estimateMilliseconds);
+
     day.totalSpentMilliseconds = todayTasks
-      .fold(0, (sum, t) => sum + (t.durationLeft?.inMilliseconds ?? 0));
+      .fold(0, (sum, t) => sum + t.durationLeftMilliseconds);
 
     // === 3. СЧИТАЕМ ПЕРЕНОС НА СЛЕДУЮЩИЙ ДЕНЬ ===
     // Перенос = spent - estimate (только если положительный)
@@ -366,7 +434,7 @@ class TimeTrackerService extends ChangeNotifier {
 
     // === 5. СОЗДАЁМ СЛЕДУЮЩИЙ ДЕНЬ С ПЕРЕНОСОМ ===
     final now = DateTime.now();
-    final tomorrow = (now.startOfDay ?? now).add(const Duration(days: 1));
+    final tomorrow = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
     final nextDay = WorkDay()
       ..createToDate = tomorrow
       ..prevWorkTimeMilliseconds = nextDayCarried.inMilliseconds;
@@ -375,7 +443,7 @@ class TimeTrackerService extends ChangeNotifier {
     _objectBox.putWorkDay(day);
     _objectBox.putWorkDay(nextDay);
 
-    if (isSoft) {
+    if (!isSoft) {
       GlobalTimer().playTimeUpSound();
     }
 

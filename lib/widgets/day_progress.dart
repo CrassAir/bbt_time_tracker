@@ -52,14 +52,16 @@ class _MultiLevelCircularProgressState
         final workDay = service.currentWorkDay;
         final isRun = workDay?.startWorkDateTime != null &&
             workDay?.endWorkDateTime == null;
-        final leftSeconds = service.todayLeftSeconds;
-        final spentSeconds = service.todaySpentSeconds;
-        final totalSeconds = 28800; // 8 часов
-        final isOffDay = service.isOffDay;
-        final curSeconds = isOffDay ? totalSeconds : leftSeconds;
-
-        double leftProgress = leftSeconds / totalSeconds;
-        double spentProgress = spentSeconds / totalSeconds;
+        
+        // Используем новые поля
+        final workSeconds = service.todayWorkSeconds;
+        final remainingSeconds = service.todayRemainingSeconds;
+        final freeSeconds = service.freeSeconds;
+        final debtSeconds = service.debtSeconds;
+        final totalSeconds = 8 * 3600; // 8 часов
+        
+        // Прогресс рабочего дня
+        final workProgress = workSeconds / totalSeconds;
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -128,25 +130,13 @@ class _MultiLevelCircularProgressState
                           angleOffset: 0,
                         ),
                       ),
-                      // Прогресс прошедшего времени дня
+                      // Прогресс рабочего дня
                       CustomPaint(
                         painter: CustomPainterCircle(
-                          progress: (leftProgress * _animation.value)
+                          progress: (workProgress * _animation.value)
                               .clamp(0, 1),
                           color: Colors.grey.shade600,
                           strokeWidth: 25,
-                          angleOffset: 0,
-                        ),
-                      ),
-                      // Прогресс затраченного времени на задачи
-                      CustomPaint(
-                        painter: CustomPainterCircle(
-                          progress: (spentProgress * _animation.value)
-                              .clamp(0.0, 1.0),
-                          color: spentSeconds > curSeconds
-                              ? Colors.green.shade400
-                              : Colors.red.shade400,
-                          strokeWidth: 20,
                           angleOffset: 0,
                         ),
                       ),
@@ -181,20 +171,20 @@ class _MultiLevelCircularProgressState
                               ),
                             ),
                             const SizedBox(height: 4),
+                            // Время работы дня
                             Text(
-                              leftSeconds <= 0
+                              !isRun
                                   ? 'start in 11:00'
-                                  : leftSeconds.toHoursMinutesSeconds,
+                                  : workSeconds.toHoursMinutesSeconds,
                               style: TextStyle(
                                 fontSize: 18,
                                 color: Colors.grey.shade300,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            if (isRun && leftSeconds > 0)
+                            if (isRun)
                               Text(
-                                (totalSeconds - leftSeconds)
-                                    .toHoursMinutesSeconds,
+                                'of ${totalSeconds.toHoursMinutesSeconds} (left: ${remainingSeconds.toHoursMinutesSeconds})',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade500,
@@ -202,10 +192,13 @@ class _MultiLevelCircularProgressState
                                 ),
                               ),
                             const SizedBox(height: 8),
+                            // Баланс времени
                             Text(
-                              spentSeconds > curSeconds
-                                  ? 'Free time'
-                                  : 'Lack of time',
+                              debtSeconds > 0
+                                  ? 'Lack of time'
+                                  : freeSeconds > 0
+                                      ? 'Free time'
+                                      : 'On schedule',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: Colors.grey.shade400,
@@ -214,17 +207,19 @@ class _MultiLevelCircularProgressState
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              spentSeconds > curSeconds
-                                  ? (spentSeconds - curSeconds)
-                                  .toHoursMinutesSeconds
-                                  : (curSeconds - spentSeconds)
-                                  .toHoursMinutesSeconds,
+                              debtSeconds > 0
+                                  ? debtSeconds.toHoursMinutesSeconds
+                                  : freeSeconds > 0
+                                      ? freeSeconds.toHoursMinutesSeconds
+                                      : '0h 0m 0s',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: spentSeconds > curSeconds
-                                    ? Colors.green.shade400
-                                    : Colors.red.shade400,
+                                color: debtSeconds > 0
+                                    ? Colors.red.shade400
+                                    : freeSeconds > 0
+                                        ? Colors.green.shade400
+                                        : Colors.grey.shade400,
                               ),
                             ),
                             const SizedBox(height: 12),
