@@ -1302,15 +1302,15 @@ class TelegramBotService extends ChangeNotifier {
               }
             }
 
-            // Update the final message - remove stop button, send full response
+            // Delete thinking message and send result as separate message
+            try {
+              await _bot!.api.deleteMessage(tgChatId, placeholderMsgId);
+            } catch (_) {}
+
             if (response.isEmpty) {
               // Empty response
               try {
-                await _bot!.api.editMessageText(
-                  tgChatId,
-                  placeholderMsgId,
-                  '(пустой ответ)',
-                );
+                await ctx.reply('(пустой ответ)');
               } catch (_) {}
             } else if (response.length > 3500) {
               // Send as .md file
@@ -1319,14 +1319,6 @@ class TelegramBotService extends ChangeNotifier {
               final tempFile = io.File(tempPath);
               await tempFile.writeAsString(response);
 
-              try {
-                await _bot!.api.editMessageText(
-                  tgChatId,
-                  placeholderMsgId,
-                  '✅ Готово! Ответ большой, поэтому отправляю как файл.',
-                );
-              } catch (_) {}
-
               final inputFile = InputFile.fromFile(tempFile, name: fileName);
               await ctx.replyWithDocument(inputFile, caption: '📄 Ответ Qwen Code');
 
@@ -1334,16 +1326,8 @@ class TelegramBotService extends ChangeNotifier {
                 await tempFile.delete();
               } catch (_) {}
             } else {
-              // Send as text - update existing message, remove stop button
-              try {
-                await _bot!.api.editMessageText(
-                  tgChatId,
-                  placeholderMsgId,
-                  response,
-                );
-              } catch (_) {
-                await ctx.reply(response);
-              }
+              // Send as text
+              await ctx.reply(response);
             }
 
             await _sendFilesFromResponse(ctx, response);
@@ -1353,41 +1337,31 @@ class TelegramBotService extends ChangeNotifier {
             final errorText = event.text ?? 'Unknown error';
             updateMessage(msgId,
                 response: 'Error: $errorText', status: MessageStatus.error);
+            // Delete thinking message and send error
             try {
-              await _bot!.api.editMessageText(
-                tgChatId,
-                placeholderMsgId,
-                '❌ Error: $errorText',
-              );
-            } catch (_) {
-              await ctx.reply('Error: $errorText');
-            }
+              await _bot!.api.deleteMessage(tgChatId, placeholderMsgId);
+            } catch (_) {}
+            await ctx.reply('❌ Error: $errorText');
         }
       }
 
       // If stopped by user
       if (isStopped) {
         _stopCallbacks.remove(msgId);
+        // Delete thinking message and send stopped notification
         try {
-          await _bot!.api.editMessageText(
-            tgChatId,
-            placeholderMsgId,
-            '⏹️ Остановлено пользователем',
-          );
+          await _bot!.api.deleteMessage(tgChatId, placeholderMsgId);
         } catch (_) {}
+        await ctx.reply('⏹️ Остановлено пользователем');
       }
     } catch (e) {
       _stopCallbacks.remove(msgId);
       final errorStr = e.toString();
+      // Delete thinking message and send error
       try {
-        await _bot!.api.editMessageText(
-          tgChatId,
-          placeholderMsgId,
-          '❌ Error: $errorStr',
-        );
-      } catch (_) {
-        await ctx.reply('Error: $errorStr');
-      }
+        await _bot!.api.deleteMessage(tgChatId, placeholderMsgId);
+      } catch (_) {}
+      await ctx.reply('❌ Error: $errorStr');
       _log.error('Error processing message: $errorStr');
     }
 
@@ -1433,16 +1407,14 @@ class TelegramBotService extends ChangeNotifier {
           switch (event.type) {
             case StreamEventType.init:
               // Session started - update status
-              if (placeholderMsgId != null) {
-                try {
-                  await _bot!.api.editMessageText(
-                    tgChatId,
-                    placeholderMsgId,
-                    '⏳ Обрабатываю...',
-                    replyMarkup: _buildStopKeyboard(msgId),
-                  );
-                } catch (_) {}
-              }
+              try {
+                await _bot!.api.editMessageText(
+                  tgChatId,
+                  placeholderMsgId,
+                  '⏳ Обрабатываю...',
+                  replyMarkup: _buildStopKeyboard(msgId),
+                );
+              } catch (_) {}
 
             case StreamEventType.textDelta:
               accumulated.write(event.text);
@@ -1451,7 +1423,7 @@ class TelegramBotService extends ChangeNotifier {
               final now = DateTime.now();
               if (now.difference(lastEditTime) >= _editInterval) {
                 final preview = _truncatePreview(accumulated.toString());
-                if (preview != lastEditedText && placeholderMsgId != null) {
+                if (preview != lastEditedText) {
                   try {
                     await _bot!.api.editMessageText(
                       tgChatId,
@@ -1469,7 +1441,7 @@ class TelegramBotService extends ChangeNotifier {
 
             case StreamEventType.toolUse:
               // Show tool use progress
-              if (event.text != null && event.text!.isNotEmpty && placeholderMsgId != null) {
+              if (event.text != null && event.text!.isNotEmpty) {
                 try {
                   await _bot!.api.editMessageText(
                     tgChatId,
@@ -1483,17 +1455,18 @@ class TelegramBotService extends ChangeNotifier {
             case StreamEventType.result:
               // Final result received - remove stop button
               _stopCallbacks.remove(msgId);
-              
+
               final response = event.fullResult ?? accumulated.toString();
-              
+
+              // Delete thinking message and send result as separate message
+              try {
+                await _bot!.api.deleteMessage(tgChatId, placeholderMsgId);
+              } catch (_) {}
+
               if (response.isEmpty) {
                 // Empty response
                 try {
-                  await _bot!.api.editMessageText(
-                    tgChatId,
-                    placeholderMsgId ?? 0,
-                    '(пустой ответ)',
-                  );
+                  await ctx.reply('(пустой ответ)');
                 } catch (_) {}
               } else if (response.length > 3500) {
                 // Send as .md file
@@ -1501,73 +1474,46 @@ class TelegramBotService extends ChangeNotifier {
                 final tempPath = '${io.Directory.systemTemp.path}\\$fileName';
                 final tempFile = io.File(tempPath);
                 await tempFile.writeAsString(response);
-                
-                try {
-                  await _bot!.api.editMessageText(
-                    tgChatId,
-                    placeholderMsgId ?? 0,
-                    '✅ Готово! Ответ большой, поэтому отправляю как файл.',
-                  );
-                } catch (_) {}
-                
+
                 final inputFile = InputFile.fromFile(tempFile, name: fileName);
                 await ctx.replyWithDocument(inputFile, caption: '📄 Ответ Qwen Code');
-                
+
                 try {
                   await tempFile.delete();
                 } catch (_) {}
               } else {
-                // Send as text - remove stop button
-                try {
-                  await _bot!.api.editMessageText(
-                    tgChatId,
-                    placeholderMsgId ?? 0,
-                    response,
-                  );
-                } catch (_) {
-                  await ctx.reply(response);
-                }
+                // Send as text
+                await ctx.reply(response);
               }
 
             case StreamEventType.error:
               _stopCallbacks.remove(msgId);
               final errorStr = event.text ?? 'Unknown error';
+              // Delete thinking message and send error
               try {
-                await _bot!.api.editMessageText(
-                  tgChatId,
-                  placeholderMsgId ?? 0,
-                  '❌ Error: $errorStr',
-                );
-              } catch (_) {
-                await ctx.reply('Error: $errorStr');
-              }
+                await _bot!.api.deleteMessage(tgChatId, placeholderMsgId);
+              } catch (_) {}
+              await ctx.reply('❌ Error: $errorStr');
           }
 
           notifyListeners();
         }
-        
+
         // If stopped by user
-        if (isStopped && placeholderMsgId != null) {
+        if (isStopped) {
           try {
-            await _bot!.api.editMessageText(
-              tgChatId,
-              placeholderMsgId,
-              '⏹️ Остановлено пользователем',
-            );
+            await _bot!.api.deleteMessage(tgChatId, placeholderMsgId);
           } catch (_) {}
+          await ctx.reply('⏹️ Остановлено пользователем');
         }
       } catch (e) {
         _stopCallbacks.remove(msgId);
         final errorStr = e.toString();
+        // Delete thinking message and send error
         try {
-          await _bot!.api.editMessageText(
-            tgChatId,
-            placeholderMsgId ?? 0,
-            '❌ Error: $errorStr',
-          );
-        } catch (_) {
-          await ctx.reply('Error: $errorStr');
-        }
+          await _bot!.api.deleteMessage(tgChatId, placeholderMsgId);
+        } catch (_) {}
+        await ctx.reply('❌ Error: $errorStr');
         _log.error('Error processing command: $errorStr');
       }
     } catch (e) {
